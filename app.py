@@ -100,3 +100,35 @@ if st.session_state.fim and st.session_state.inicio:
         st.write(f"- {setor}: {linha['Percentual']:.1f}%")
 
     st.success("Relatório gerado com sucesso!")
+
+
+    # Gerar PDF
+    from io import BytesIO
+    from fpdf import FPDF
+
+    pdf_buffer = BytesIO()
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(200, 10, f"Relatório de Diagnóstico - Rehsult Grãos", ln=True, align="C")
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(200, 10, f"Fazenda: {st.session_state.fazenda}", ln=True)
+    pdf.cell(200, 10, f"Responsável: {st.session_state.responsavel}", ln=True)
+    pdf.cell(200, 10, f"Pontuação Geral: {nota_geral:.1f}%", ln=True)
+
+    pdf.ln(10)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(200, 10, "Desempenho por Setor:", ln=True)
+    pdf.set_font("Arial", "", 12)
+    for setor, linha in setores.iterrows():
+        pdf.cell(200, 10, f"- {setor}: {linha['Percentual']:.1f}%", ln=True)
+
+    pdf.ln(10)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(200, 10, "Tópicos a Melhorar:", ln=True)
+    pdf.set_font("Arial", "", 12)
+    for setor, linha in pior_setores.iterrows():
+        pdf.cell(200, 10, f"- {setor}: {linha['Percentual']:.1f}%", ln=True)
+
+    pdf.output(pdf_buffer)
+    st.download_button("📄 Baixar Relatório em PDF", data=pdf_buffer.getvalue(), file_name="relatorio_rehsult_graos.pdf", mime="application/pdf")
