@@ -6,87 +6,130 @@ from io import BytesIO
 from fpdf import FPDF
 
 st.set_page_config(page_title="Rehsult Grãos - Diagnóstico", layout="centered")
-st.title("🌾 Rehsult Grãos - Diagnóstico de Fazenda")
-st.image("LOGO REAGRO TRATADA.png", width=150)
+st.image("logo_rehagro.png", width=200)
+st.title("Rehsult Grãos - Diagnóstico de Fazenda")
 
 @st.cache_data
 def carregar_dados():
     df = pd.read_excel("Teste Chat.xlsx", sheet_name=None)
-    perguntas_df = df['Fertilidade']
-    setores_df = perguntas_df.iloc[:, [1, 7]]
-    setores_df.columns = ['Setor', 'Peso']
-    setores_df = setores_df.dropna().drop_duplicates()
+    perguntas_df = df['Perguntas']
+    setores_df = perguntas_df[['Setor', 'Peso']].dropna().drop_duplicates()
     return perguntas_df, setores_df
 
 perguntas_df, setores_df = carregar_dados()
 
+if 'etapa' not in st.session_state:
+    st.session_state.etapa = 'inicio'
 if 'respostas' not in st.session_state:
     st.session_state.respostas = {}
-if 'indice_pergunta' not in st.session_state:
-    st.session_state.indice_pergunta = 0
 
-if 'fazenda' not in st.session_state:
-    st.session_state.fazenda = ''
-if 'responsavel' not in st.session_state:
-    st.session_state.responsavel = ''
-
-if st.session_state.indice_pergunta == 0:
+if st.session_state.etapa == 'inicio':
     st.session_state.fazenda = st.text_input("Nome da Fazenda")
     st.session_state.responsavel = st.text_input("Nome do Responsável")
+    st.session_state.soja = st.number_input("Produtividade de soja (sc/ha) na safra passada", min_value=0)
+    st.session_state.milho = st.number_input("Produtividade de milho (sc/ha) na safra passada", min_value=0)
     if st.button("Iniciar Diagnóstico"):
-        st.session_state.indice_pergunta += 1
-    st.stop()
+        st.session_state.etapa = 'perguntas'
+        st.session_state.indice = 0
+        st.rerun()
 
-perguntas_validas = perguntas_df.dropna(subset=['Pergunta']).reset_index(drop=True)
+elif st.session_state.etapa == 'perguntas':
+    indice = st.session_state.indice
+    perguntas_validas = perguntas_df.dropna(subset=['Pergunta'])
 
-if st.session_state.indice_pergunta <= len(perguntas_validas):
-    linha = perguntas_validas.iloc[st.session_state.indice_pergunta - 1]
-    pergunta = linha['Pergunta']
-    chave = f"pergunta_{st.session_state.indice_pergunta}"
-    resposta = st.radio(pergunta, ["Sim", "Não", "Não sei"], key=chave)
-    if st.button("Responder"):
-        st.session_state.respostas[linha['ID']] = resposta
-        st.session_state.indice_pergunta += 1
-        st.experimental_rerun()
-else:
-    st.success("Diagnóstico finalizado!")
+    if indice < len(perguntas_validas):
+        pergunta = perguntas_validas.iloc[indice]
+        texto = pergunta['Pergunta']
+        codigo = pergunta['Código']
+        resposta = st.radio(texto, ['Sim', 'Não', 'Não sei'])
+        if st.button("Responder"):
+            st.session_state.respostas[codigo] = resposta
+            st.session_state.indice += 1
+            st.rerun()
+    else:
+        st.session_state.etapa = 'resultado'
+        st.rerun()
 
-    notas = []
-    for _, linha in perguntas_validas.iterrows():
-        resposta = st.session_state.respostas.get(linha['ID'])
-        peso = linha['Peso']
-        if resposta == "Sim":
-            nota = peso
-        elif resposta == "Não":
-            nota = 0
-        else:
-            nota = 0
-        notas.append((linha['Setor'], nota))
+elif st.session_state.etapa == 'resultado':
+    st.header("Resultado do Diagnóstico")
 
-    df_resultado = pd.DataFrame(notas, columns=["Setor", "Nota"])
-    df_agrupado = df_resultado.groupby("Setor").agg({'Nota': 'sum'}).reset_index()
-    setores_com_peso = setores_df.set_index('Setor')['Peso']
-    df_agrupado["Peso Total"] = df_agrupado["Setor"].map(setores_com_peso)
-    df_agrupado["Percentual"] = (df_agrupado["Nota"] / df_agrupado["Peso Total"]) * 100
+    respostas = st.session_state.respostas
+    setores = setores_df['Setor'].unique()
+    resultados = []
 
-    st.subheader("📊 Resultado por Setor")
-    st.dataframe(df_agrupado)
+    for setor in setores:
+        perguntas_setor = perguntas_df[perguntas_df['Setor'] == setor]
+        total_peso = perguntas_setor['Peso'].sum()
+        pontos = 0
+        peso_respondido = 0
 
-    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
-    categorias = df_agrupado["Setor"]
-    valores = df_agrupado["Percentual"]
-    valores = np.append(valores, valores[0])
-    angulos = np.linspace(0, 2 * np.pi, len(categorias), endpoint=False)
-    angulos = np.append(angulos, angulos[0])
-    ax.plot(angulos, valores, 'green', linewidth=2)
-    ax.fill(angulos, valores, 'green', alpha=0.25)
-    ax.set_xticks(angulos[:-1])
-    ax.set_xticklabels(categorias)
+        for _, linha in perguntas_setor.iterrows():
+            codigo = linha['Código']
+            peso = linha['Peso']
+            nota = linha['Nota']
+            resposta = respostas.get(codigo)
+
+            if pd.notna(nota) and resposta == 'Sim':
+                pontos += nota * peso / 100
+                peso_respondido += peso
+            elif resposta in ['Não', 'Não sei']:
+                peso_respondido += peso
+
+        if peso_respondido > 0:
+            percentual = round((pontos / peso_respondido) * 100)
+            resultados.append({"Setor": setor, "Pontuacao": percentual})
+
+    resultados_df = pd.DataFrame(resultados)
+    nota_geral = round(resultados_df['Pontuacao'].mean())
+
+    # Radar
+    categorias = resultados_df['Setor'].tolist()
+    valores = resultados_df['Pontuacao'].tolist()
+    categorias.append(categorias[0])
+    valores.append(valores[0])
+
+    angles = np.linspace(0, 2 * np.pi, len(categorias), endpoint=False).tolist()
+    angles += angles[:1]
+
+    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
+    ax.plot(angles, valores, 'o-', linewidth=2)
+    ax.fill(angles, valores, alpha=0.25)
     ax.set_yticklabels([])
-    ax.set_title("Desempenho por Setor")
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(categorias)
     st.pyplot(fig)
 
-    # Gerar PDF
+    # IA - Sugestão
+    sugestoes = []
+    for _, linha in resultados_df.iterrows():
+        if linha['Pontuacao'] < 50:
+            sugestoes.append(f"O setor {linha['Setor']} apresenta baixa pontuação e pode ser melhorado.")
+
+    # Produtividade
+    def classificar_prod(cultura, valor):
+        if cultura == "Soja":
+            if valor < 65:
+                return "Baixa"
+            elif valor <= 75:
+                return "Média"
+            elif valor <= 90:
+                return "Alta"
+            else:
+                return "Muito Alta"
+        if cultura == "Milho":
+            if valor < 170:
+                return "Baixa"
+            elif valor <= 190:
+                return "Média"
+            elif valor <= 205:
+                return "Alta"
+            else:
+                return "Muito Alta"
+
+    prod_soja = classificar_prod("Soja", st.session_state.soja)
+    prod_milho = classificar_prod("Milho", st.session_state.milho)
+
+    # PDF
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
@@ -94,13 +137,27 @@ else:
     pdf.set_font("Arial", "", 12)
     pdf.cell(200, 10, f"Fazenda: {st.session_state.fazenda}", ln=True)
     pdf.cell(200, 10, f"Responsável: {st.session_state.responsavel}", ln=True)
-    pdf.ln(10)
-    nota_geral = df_agrupado['Percentual'].mean()
-    pdf.cell(200, 10, f"Pontuação Geral da Fazenda: {nota_geral:.0f}/100", ln=True)
-    pdf.ln(10)
-    for _, linha in df_agrupado.iterrows():
-        pdf.cell(200, 10, f"- {linha['Setor']}: {linha['Percentual']:.0f}/100", ln=True)
+    pdf.cell(200, 10, f"Pontuação Geral da Fazenda: {nota_geral}/100", ln=True)
+    pdf.cell(200, 10, f"Produtividade soja: {st.session_state.soja} sc/ha - {prod_soja}", ln=True)
+    pdf.cell(200, 10, f"Produtividade milho: {st.session_state.milho} sc/ha - {prod_milho}", ln=True)
 
-    pdf_buffer = BytesIO()
-    pdf.output(pdf_buffer, 'F')
-    st.download_button("📄 Baixar Relatório em PDF", data=pdf_buffer.getvalue(), file_name="relatorio_rehsult.pdf")
+    pdf.ln(10)
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(190, 10, "Resultados por Setor:", ln=True)
+    pdf.set_font("Arial", "", 12)
+    for _, linha in resultados_df.iterrows():
+        pdf.cell(200, 10, f"- {linha['Setor']}: {linha['Pontuacao']}/100", ln=True)
+
+    if sugestoes:
+        pdf.ln(10)
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(190, 10, "Sugestões de melhoria:", ln=True)
+        pdf.set_font("Arial", "", 12)
+        for sugestao in sugestoes:
+            pdf.cell(200, 10, f"- {sugestao}", ln=True)
+
+    buffer = BytesIO()
+    pdf.output(buffer, dest='F')
+    buffer.seek(0)
+
+    st.download_button("📄 Baixar Relatório em PDF", data=buffer, file_name="diagnostico.pdf", mime="application/pdf")
