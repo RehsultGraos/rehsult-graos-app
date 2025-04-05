@@ -1,115 +1,126 @@
+
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from io import BytesIO
+from fpdf import FPDF
 
-# Carregar dados
-@st.cache
-def carregar_dados():
-    # Ajuste para garantir que a planilha seja lida corretamente
-    df = pd.read_excel('Teste Chat.xlsx', sheet_name='Fertilidade')  # Altere para o caminho correto se necessário
-    return df
+st.set_page_config(page_title="Rehsult Grãos - Diagnóstico", layout="centered")
 
-# Função para classificar as produtividades
-def classificar_produtividade(valor, cultura):
-    if cultura == 'Soja':
-        if valor < 65:
-            return 'Baixa'
-        elif 65.1 <= valor <= 75:
-            return 'Média'
-        elif 75.1 <= valor <= 90:
-            return 'Alta'
-        else:
-            return 'Muito Alta'
-    elif cultura == 'Milho':
-        if valor < 170:
-            return 'Baixa'
-        elif 171 <= valor <= 190:
-            return 'Média'
-        elif 191 <= valor <= 205:
-            return 'Alta'
-        else:
-            return 'Muito Alta'
+# Iniciar variáveis de controle
+if "inicio" not in st.session_state:
+    st.session_state.inicio = False
+if "respostas" not in st.session_state:
+    st.session_state.respostas = {}
+    st.session_state.pergunta_atual = 1
+    st.session_state.fim = False
 
-# Função para exibir o gráfico radar
-def gerar_grafico(setores, notas):
-    fig, ax = plt.subplots(figsize=(6, 6), dpi=80)
-    ax.set_theta_offset(0.5 * np.pi)
-    ax.set_theta_direction(-1)
-    
-    categorias = setores
-    valores = notas
+# Cabeçalho e entrada de dados só se ainda não começou
+if not st.session_state.inicio:
+    st.image("LOGO REAGRO TRATADA.png", width=200)
+    st.title("🌾 Rehsult Grãos - Diagnóstico de Fazenda")
+    st.markdown("""
+    **Bem-vindo ao Rehsult Grãos!**
 
-    ax.plot(categorias, valores, color='green', linewidth=3)
-    ax.fill(categorias, valores, color='green', alpha=0.3)
+    Este é um sistema de diagnóstico para fazendas produtoras de grãos. Você responderá uma pergunta por vez, e ao final, verá um relatório com pontuação geral, gráfico de radar e recomendações.
+    """)
+    st.text_input("Nome da Fazenda", key="fazenda")
+    st.text_input("Nome do Responsável", key="responsavel")
+    if st.button("Iniciar Diagnóstico"):
+        st.session_state.inicio = True
 
-    ax.set_xticklabels(categorias, fontsize=8)
-    ax.set_yticklabels([f'{x}%' for x in range(0, 101, 20)], fontsize=8)
-    plt.title("Desempenho por Setor", size=14)
-    return fig
+# Diagnóstico após clique
+if st.session_state.inicio:
+    st.image("LOGO REAGRO TRATADA.png", width=150)
 
-# Função para gerar PDF
-def gerar_pdf():
-    from fpdf import FPDF
+    df_fert = pd.read_excel("Teste Chat.xlsx", sheet_name="Fertilidade")
+    df_planta = pd.read_excel("Teste Chat.xlsx", sheet_name="Planta Daninha")
+    df = pd.concat([df_fert, df_planta], ignore_index=True)
+    df["Nota"] = pd.to_numeric(df["Nota"], errors="coerce")
+    df = df.dropna(subset=["Referência", "Pergunta", "Nota"])
+    df["Referência"] = df["Referência"].astype(int)
+    perguntas_dict = df.set_index("Referência").to_dict(orient="index")
+
+    ref = st.session_state.pergunta_atual
+    if not st.session_state.fim and ref in perguntas_dict:
+        dados = perguntas_dict[ref]
+        resposta = st.radio(dados["Pergunta"], ["Sim", "Não", "Não sei"], key=f"ref_{ref}")
+        if st.button("Responder", key=f"btn_{ref}"):
+            st.session_state.respostas[ref] = {
+                "Setor": dados["Setor"],
+                "Área": dados["Área"],
+                "Pergunta": dados["Pergunta"],
+                "Nota": dados["Nota"],
+                "Resposta": resposta
+            }
+            if resposta == "Sim" and not pd.isna(dados["Sim"]):
+                st.session_state.pergunta_atual = int(dados["Sim"])
+            elif not pd.isna(dados["Não"]):
+                st.session_state.pergunta_atual = int(dados["Não"])
+            else:
+                st.session_state.fim = True
+    else:
+        st.session_state.fim = True
+
+# Finalização do diagnóstico
+if st.session_state.fim and st.session_state.inicio:
+    st.markdown("## ✅ Diagnóstico Concluído")
+    df_resultado = pd.DataFrame(st.session_state.respostas).T
+    mapa = {"Sim": 1, "Não": 0, "Não sei": 0.5}
+    df_resultado["Score"] = df_resultado["Resposta"].map(mapa) * df_resultado["Nota"]
+
+    setores = df_resultado.groupby("Setor").agg({"Score": "sum", "Nota": "sum"})
+    setores["Percentual"] = (setores["Score"] / setores["Nota"]) * 100
+    nota_geral = (df_resultado["Score"].sum() / df_resultado["Nota"].sum()) * 100
+    st.markdown(f"### Pontuação Geral da Fazenda: **{nota_geral:.1f}%**")
+
+    labels = setores.index.tolist()
+    valores = setores["Percentual"].tolist()
+    valores += valores[:1]
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
+    angles += angles[:1]
+
+    fig, ax = plt.subplots(figsize=(6,6), subplot_kw=dict(polar=True))
+    ax.plot(angles, valores, color='green')
+    ax.fill(angles, valores, color='green', alpha=0.25)
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.set_title("Desempenho por Setor")
+    st.pyplot(fig)
+
+    st.markdown("### Tópicos a Melhorar:")
+    pior_setores = setores.sort_values("Percentual").head(3)
+    for setor, linha in pior_setores.iterrows():
+        st.write(f"- {setor}: {linha['Percentual']:.1f}%")
+
+    # PDF
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
+    pdf.image("LOGO REAGRO TRATADA.png", x=70, y=10, w=70)
+    pdf.set_xy(10, 40)
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(190, 10, "Relatório de Diagnóstico - Rehsult Grãos", ln=True, align="C")
+    pdf.set_font("Arial", "", 12)
+    pdf.ln(5)
+    fazenda = st.session_state.get("fazenda", "NÃO INFORMADO")
+    pdf.cell(200, 10, f"Fazenda: {fazenda}", ln=True)
+    responsavel = st.session_state.get("responsavel", "NÃO INFORMADO")
+    pdf.cell(200, 10, f"Responsável: {responsavel}", ln=True)
+    pdf.cell(200, 10, f"Pontuação Geral: {nota_geral:.1f}%", ln=True)
+    pdf.ln(10)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(200, 10, "Desempenho por Setor:", ln=True)
+    pdf.set_font("Arial", "", 12)
+    for setor, linha in setores.iterrows():
+        pdf.cell(200, 10, f"- {setor}: {linha['Percentual']:.1f}%", ln=True)
+    pdf.ln(5)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(200, 10, "Tópicos a Melhorar:", ln=True)
+    pdf.set_font("Arial", "", 12)
+    for setor, linha in pior_setores.iterrows():
+        pdf.cell(200, 10, f"- {setor}: {linha['Percentual']:.1f}%", ln=True)
 
-    # Inserir informações no PDF
-    pdf.cell(200, 10, txt="Relatório de Diagnóstico - Rehsult Grãos", ln=True, align="C")
-    pdf.cell(200, 10, txt=f"Fazenda: {st.session_state.fazenda}", ln=True)
-    pdf.cell(200, 10, txt=f"Responsável: {st.session_state.responsavel}", ln=True)
-    pdf.cell(200, 10, txt=f"Pontuação Geral: {st.session_state.pontuacao}%", ln=True)
-
-    # Inserir gráfico
-    img_buffer = BytesIO()
-    fig = gerar_grafico(st.session_state.setores, st.session_state.notas)
-    fig.savefig(img_buffer, format="png")
-    img_buffer.seek(0)
-    pdf.image(img_buffer, x=10, y=50, w=190)
-
-    # Gerar o arquivo PDF
-    return pdf.output(dest='S').encode('latin1')
-
-# Interface com o usuário
-def main():
-    st.set_page_config(page_title="Rehsult Grãos - Diagnóstico", layout="centered")
-    
-    st.title("🌾 Rehsult Grãos - Diagnóstico de Fertilidade")
-
-    # Receber informações sobre a fazenda
-    st.session_state.fazenda = st.text_input('Nome da Fazenda')
-    st.session_state.responsavel = st.text_input('Nome do Responsável')
-
-    # Receber a produtividade de soja e milho
-    soja_produtividade = st.number_input('Produtividade de Soja (safra passada)', min_value=0)
-    milho_produtividade = st.number_input('Produtividade de Milho (safra passada)', min_value=0)
-
-    # Classificar as produtividades
-    soja_classificacao = classificar_produtividade(soja_produtividade, 'Soja')
-    milho_classificacao = classificar_produtividade(milho_produtividade, 'Milho')
-
-    st.write(f"Classificação de Soja: {soja_classificacao}")
-    st.write(f"Classificação de Milho: {milho_classificacao}")
-
-    # Carregar os dados e exibir a tabela
-    df = carregar_dados()
-    st.write(df)
-
-    # Lógica de vínculo (dependendo da resposta, mostrar as perguntas seguintes)
-    # Exemplo de vínculo: Perguntas que dependem de respostas anteriores
-    if pd.notna(df.iloc[10]['G']):
-        st.write("Exibindo pergunta vinculada 10")
-        # Adicione aqui a lógica para exibir a pergunta 10, dependendo da resposta
-
-    # Gerar o gráfico e PDF quando o usuário finalizar
-    if st.button('Gerar Relatório'):
-        st.session_state.setores = ['Adubação Orgânica', 'Análise de Solo', 'Fertilizantes', 'Manutenção de Áreas']  # Exemplo de setores
-        st.session_state.notas = [80, 70, 90, 60]  # Exemplo de notas
-        pdf_output = gerar_pdf()
-        
-        st.download_button("Baixar Relatório PDF", data=pdf_output, file_name="relatorio_fazenda.pdf", mime="application/pdf")
-
-if __name__ == "__main__":
-    main()
-
+    pdf_buffer = BytesIO()
+    pdf.output(pdf_buffer)
+    st.download_button("📄 Baixar Relatório em PDF", data=pdf_buffer.getvalue(), file_name="relatorio_rehsult_graos.pdf", mime="application/pdf")
