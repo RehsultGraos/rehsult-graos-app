@@ -45,11 +45,12 @@ if st.session_state.etapa == 'perguntas':
     indice = st.session_state.indice
 
     if indice < len(perguntas_validas):
-        pergunta = perguntas_validas.iloc[indice]
-        st.write(f"**{pergunta['Pergunta']}**")
+        linha = perguntas_validas.iloc[indice]
+        pergunta = linha['Pergunta']
+        st.write(f"**{pergunta}**")
         resposta = st.radio("Resposta:", ['Sim', 'Não', 'Não sei'], key=f"resposta_{indice}")
         if st.button("Responder", key=f"botao_{indice}"):
-            st.session_state.respostas[pergunta['ID']] = resposta
+            st.session_state.respostas[linha['ID']] = resposta
             st.session_state.indice += 1
             st.rerun()
     else:
