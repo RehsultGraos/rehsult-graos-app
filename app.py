@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Rehsult Grãos - Diagnóstico", layout="centered")
 st.title("🌾 Rehsult Grãos - Diagnóstico de Fazenda")
 
-st.image("https://tecnocoffeeapi.rehagro.com.br/storage/imagens/rehagro.png", width=200)
+st.image("LOGO REAGRO TRATADA.png", width=200)
 
 st.markdown("""
 **Bem-vindo ao Rehsult Grãos!**
