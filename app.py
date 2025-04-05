@@ -16,6 +16,13 @@ Este é um sistema de diagnóstico para fazendas produtoras de grãos. Você res
 """)
 
 # Início da sessão
+if "inicio" not in st.session_state:
+    st.session_state.inicio = False
+
+if not st.session_state.inicio:
+    if st.button("Iniciar Diagnóstico"):
+        st.session_state.inicio = True
+
 if "respostas" not in st.session_state:
     st.session_state.respostas = {}
     st.session_state.pergunta_atual = 1  # começa da pergunta com Referência 1
