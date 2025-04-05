@@ -1,139 +1,105 @@
 
 import streamlit as st
 import pandas as pd
-from fpdf import FPDF
-from io import BytesIO
 import matplotlib.pyplot as plt
-import numpy as np
+from io import BytesIO
+from fpdf import FPDF
 
-st.set_page_config(page_title="Rehsult Grãos - Diagnóstico", layout="centered")
+st.set_page_config(page_title="Rehsult Grãos", layout="wide")
 
 # Logo
 st.image("LOGO REAGRO TRATADA.png", width=200)
 
-# Carregamento dos dados
+st.title("Rehsult Grãos - Diagnóstico de Fertilidade")
+st.write("Este é um sistema de diagnóstico para fazendas produtoras de grãos. Você responderá perguntas e, ao final, verá um relatório com pontuação, gráfico e sugestões.")
+
 @st.cache_data
 def carregar_dados():
-    df = pd.read_excel("Teste Chat.xlsx", sheet_name="Fertilidade")
-    setores_df = df[['Setor', 'Peso']].dropna().drop_duplicates()
+    df = pd.read_excel("Teste Chat.xlsx", sheet_name="Fertilidade", header=None)
+    setores_df = df[[1, 7]].dropna().drop_duplicates()
     return df, setores_df
 
 perguntas_df, setores_df = carregar_dados()
 
-# Inicialização do estado da sessão
-if "pagina" not in st.session_state:
-    st.session_state.pagina = 0
+if "respostas" not in st.session_state:
     st.session_state.respostas = {}
-    st.session_state.fazenda = ""
-    st.session_state.responsavel = ""
 
-# Página inicial
-if st.session_state.pagina == 0:
-    st.title("Bem-vindo ao Rehsult Grãos!")
-    st.markdown("Este é um sistema de diagnóstico para fazendas produtoras de grãos. Você responderá uma pergunta por vez e, ao final, verá um relatório com pontuação geral, gráfico de radar e recomendações.")
-    st.session_state.fazenda = st.text_input("Nome da Fazenda")
-    st.session_state.responsavel = st.text_input("Nome do Responsável")
-    if st.button("Iniciar Diagnóstico"):
-        st.session_state.pagina += 1
-        st.rerun()
+if "pergunta_atual" not in st.session_state:
+    st.session_state.pergunta_atual = 0
 
-# Lógica das perguntas
-elif st.session_state.pagina <= len(perguntas_df):
-    linha = perguntas_df.iloc[st.session_state.pagina - 1]
-    
-    # Verifica se há dependência e se a resposta foi "Sim"
-    if pd.notna(linha["G"]):
-        pergunta_dependente = int(linha["G"])
-        resposta_anterior = st.session_state.respostas.get(pergunta_dependente, None)
-        if resposta_anterior != "Sim":
-            st.session_state.pagina += 1
-            st.rerun()
+def proxima_pergunta():
+    st.session_state.pergunta_atual += 1
 
-    st.subheader(f"Pergunta {int(linha['ID'])}")
-    resposta = st.radio(linha["Pergunta"], ["Sim", "Não", "Não sei"])
-    if st.button("Responder"):
-        st.session_state.respostas[int(linha["ID"])] = resposta
-        st.session_state.pagina += 1
-        st.rerun()
+# Exibição das perguntas
+while st.session_state.pergunta_atual < len(perguntas_df):
+    linha = perguntas_df.iloc[st.session_state.pergunta_atual]
+    pergunta_id = linha[0]
+    pergunta_texto = linha[1]
+    setor = linha[2]
+    peso = linha[7]
 
-# Página de resultados
-else:
-    st.header("✅ Diagnóstico Concluído")
+    # Verificar dependência
+    if pd.notna(linha[6]):
+        id_condicional = int(linha[6])
+        if st.session_state.respostas.get(id_condicional) != "Sim":
+            st.session_state.pergunta_atual += 1
+            continue
 
-    # Cálculo das notas
-    notas_setores = []
-    for setor in setores_df["Setor"].unique():
-        perguntas_setor = perguntas_df[perguntas_df["Setor"] == setor]
-        total_peso = perguntas_setor["Peso"].sum()
-        nota = 0
-        for _, linha in perguntas_setor.iterrows():
-            resposta = st.session_state.respostas.get(int(linha["ID"]))
-            if resposta == "Sim":
-                nota += linha["Peso"]
-        nota_final = (nota / total_peso) * 100 if total_peso > 0 else 0
-        notas_setores.append({"Setor": setor, "Pontuacao": round(nota_final)})
+    st.subheader(f"{int(pergunta_id)} - {pergunta_texto}")
+    resposta = st.radio("Selecione:", ["Sim", "Não", "Não sei"], key=f"pergunta_{pergunta_id}")
+    if st.button("Responder", key=f"botao_{pergunta_id}"):
+        st.session_state.respostas[pergunta_id] = resposta
+        proxima_pergunta()
+    st.stop()
 
-    df_notas = pd.DataFrame(notas_setores)
+# Cálculo das notas
+respostas = st.session_state.respostas
+notas_setor = {}
 
-    nota_geral = round(df_notas["Pontuacao"].mean())
+for _, linha in perguntas_df.iterrows():
+    pergunta_id = linha[0]
+    setor = linha[2]
+    peso = linha[7]
+    resposta = respostas.get(pergunta_id)
 
-    st.metric("Pontuação Geral da Fazenda", f"{nota_geral}/100")
-    st.dataframe(df_notas)
+    if resposta == "Sim":
+        if setor not in notas_setor:
+            notas_setor[setor] = {"pontos": 0, "peso_total": 0}
+        notas_setor[setor]["pontos"] += peso
+        notas_setor[setor]["peso_total"] += peso
+    elif resposta in ["Não", "Não sei"]:
+        if setor not in notas_setor:
+            notas_setor[setor] = {"pontos": 0, "peso_total": 0}
+        notas_setor[setor]["peso_total"] += peso
 
-    # Radar chart
-    categorias = df_notas["Setor"]
-    valores = df_notas["Pontuacao"]
+# Resultados
+st.header("Resultados do Diagnóstico")
+pontuacoes = {}
+for setor, valores in notas_setor.items():
+    if valores["peso_total"] > 0:
+        pontuacoes[setor] = round(100 * valores["pontos"] / valores["peso_total"])
 
-    num_vars = len(categorias)
-    angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
-    valores += valores[:1]
-    angles += angles[:1]
-
+if pontuacoes:
     fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
-    ax.fill(angles, valores, color='green', alpha=0.25)
-    ax.plot(angles, valores, color='green', linewidth=2)
-    ax.set_yticklabels([])
+    categorias = list(pontuacoes.keys())
+    valores = list(pontuacoes.values())
+    valores += valores[:1]
+    categorias += categorias[:1]
+    angles = [n / float(len(categorias)) * 2 * 3.14159 for n in range(len(categorias))]
+
+    ax.plot(angles, valores)
+    ax.fill(angles, valores, alpha=0.25)
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(categorias, fontsize=8)
+    ax.set_title("Desempenho por Setor")
     st.pyplot(fig)
 
-    # Geração de sugestões por IA
-    sugestoes = []
-    for _, linha in perguntas_df.iterrows():
-        resposta = st.session_state.respostas.get(int(linha["ID"]))
-        if resposta == "Não":
-            sugestoes.append(f"- {linha['Pergunta']}")
-
-    if sugestoes:
-        st.markdown("### Sugestões de Melhoria (geradas por IA)")
-        for item in sugestoes:
-            st.markdown(item)
-
-    # Geração de PDF
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(200, 10, "Relatório de Diagnóstico - Rehsult Grãos", ln=True, align="C")
-    pdf.ln(10)
-    pdf.set_font("Arial", "", 12)
-    pdf.cell(200, 10, f"Fazenda: {st.session_state.fazenda}", ln=True)
-    pdf.cell(200, 10, f"Responsável: {st.session_state.responsavel}", ln=True)
-    pdf.cell(200, 10, f"Pontuação Geral: {nota_geral}/100", ln=True)
-    pdf.ln(10)
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(200, 10, "Pontuação por Setor:", ln=True)
-    pdf.set_font("Arial", "", 12)
-    for _, linha in df_notas.iterrows():
-        pdf.cell(200, 10, f"- {linha['Setor']}: {linha['Pontuacao']}/100", ln=True)
-    if sugestoes:
-        pdf.ln(10)
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(200, 10, "Sugestões de Melhoria:", ln=True)
-        pdf.set_font("Arial", "", 12)
-        for item in sugestoes:
-            pdf.multi_cell(0, 10, item)
-
-    buffer = BytesIO()
-    pdf.output(buffer)
-    buffer.seek(0)
-    st.download_button("📄 Baixar PDF", data=buffer, file_name="diagnostico.pdf")
+# Sugestões por IA simuladas
+st.subheader("Sugestões para Melhorias")
+for setor, nota in pontuacoes.items():
+    if nota < 60:
+        st.markdown(f"- **{setor}**: Avaliar estratégias e revisar manejo. Nota atual: {nota}/100.")
+    elif nota < 80:
+        st.markdown(f"- **{setor}**: Bom desempenho, mas há espaço para evolução. Nota atual: {nota}/100.")
+    else:
+        st.markdown(f"- **{setor}**: Excelente! Manter boas práticas. Nota atual: {nota}/100.")
