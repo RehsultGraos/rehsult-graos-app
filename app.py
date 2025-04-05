@@ -45,12 +45,11 @@ if st.session_state.etapa == 'perguntas':
     indice = st.session_state.indice
 
     if indice < len(perguntas_validas):
-        linha = perguntas_validas.iloc[indice]
-        pergunta = linha['Pergunta']
-        st.write(f"**{pergunta}**")
+        pergunta = perguntas_validas.iloc[indice]
+        st.write(f"**{pergunta['Pergunta']}**")
         resposta = st.radio("Resposta:", ['Sim', 'Não', 'Não sei'], key=f"resposta_{indice}")
         if st.button("Responder", key=f"botao_{indice}"):
-            st.session_state.respostas[linha['ID']] = resposta
+            st.session_state.respostas[pergunta['ID']] = resposta
             st.session_state.indice += 1
             st.rerun()
     else:
@@ -59,8 +58,8 @@ if st.session_state.etapa == 'perguntas':
 
 if st.session_state.etapa == 'resultado':
     respostas = st.session_state.respostas
-    perguntas_df['Respondida'] = perguntas_df['ID'].apply(lambda x: x in respostas)
-    perguntas_df['Valor'] = perguntas_df['ID'].apply(lambda x: respostas.get(x, ''))
+    perguntas_df['Respondida'] = perguntas_df.index.to_series().apply(lambda x: x in respostas)
+    perguntas_df['Valor'] = perguntas_df.index.to_series().apply(lambda x: respostas.get(x, ''))
     perguntas_df['Nota obtida'] = perguntas_df.apply(
         lambda row: row['Nota'] if row['Valor'] == 'Sim' else 0, axis=1
     )
