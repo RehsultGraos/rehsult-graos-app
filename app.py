@@ -21,8 +21,12 @@ if not st.session_state.inicio:
     st.image("LOGO REAGRO TRATADA.png", width=200)
     st.title("🌾 Rehsult Grãos - Diagnóstico de Fazenda")
     st.markdown("Este é um sistema de diagnóstico para fazendas produtoras de grãos. Responda uma pergunta por vez e receba seu relatório completo.")
+    
     st.text_input("Nome da Fazenda", key="fazenda")
     st.text_input("Nome do Responsável", key="responsavel")
+    st.number_input("Produtividade média de SOJA (kg/ha)", min_value=0, key="prod_soja")
+    st.number_input("Produtividade média de MILHO (kg/ha)", min_value=0, key="prod_milho")
+    
     if st.button("Iniciar Diagnóstico"):
         st.session_state.inicio = True
 
@@ -98,6 +102,8 @@ if st.session_state.fim and st.session_state.inicio:
     pdf.set_font("Arial", "", 12)
     pdf.cell(200, 10, f"Fazenda: {st.session_state.get('fazenda', 'NÃO INFORMADO')}", ln=True)
     pdf.cell(200, 10, f"Responsável: {st.session_state.get('responsavel', 'NÃO INFORMADO')}", ln=True)
+    pdf.cell(200, 10, f"Produtividade média SOJA: {st.session_state.get('prod_soja', 0)} kg/ha", ln=True)
+    pdf.cell(200, 10, f"Produtividade média MILHO: {st.session_state.get('prod_milho', 0)} kg/ha", ln=True)
     pdf.cell(200, 10, f"Pontuação Geral: {nota_geral:.1f}%", ln=True)
     pdf.ln(10)
 
