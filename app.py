@@ -120,7 +120,7 @@ if st.session_state.decidir_proxima_area and not st.session_state.finalizado:
 
 # Relatório Final
 st.subheader("🤖 Análise com GPT-4 (simulada)")
-    setores_por_area = {}
+setores_por_area = {}
     mapa = {'Sim': 1, 'Não': 0, 'Não sei': 0.5}
 for area in st.session_state.areas_respondidas:
         df_area = pd.DataFrame(st.session_state.respostas[area]).T
