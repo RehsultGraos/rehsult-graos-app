@@ -8,6 +8,7 @@ from fpdf import FPDF
 
 st.set_page_config(page_title="Rehsult Grãos - Diagnóstico", layout="centered")
 
+# Inicialização de sessão
 if "inicio" not in st.session_state:
     st.session_state.inicio = False
 if "respostas" not in st.session_state:
@@ -18,11 +19,14 @@ if "area_atual" not in st.session_state:
     st.session_state.area_atual = None
 if "area_finalizada" not in st.session_state:
     st.session_state.area_finalizada = False
+if "transicao_pendente" not in st.session_state:
+    st.session_state.transicao_pendente = False
 if "finalizado" not in st.session_state:
     st.session_state.finalizado = False
 if "areas_respondidas" not in st.session_state:
     st.session_state.areas_respondidas = []
 
+# Tela inicial
 if not st.session_state.inicio:
     st.image("LOGO REAGRO TRATADA.png", width=200)
     st.title("🌾 Rehsult Grãos - Diagnóstico de Fazenda")
@@ -40,10 +44,10 @@ if not st.session_state.inicio:
         df_inicio = df_inicio.sort_values("Referência")
         st.session_state.pergunta_atual = int(df_inicio["Referência"].iloc[0])
         st.session_state.area_finalizada = False
+        st.session_state.transicao_pendente = False
 
-# Diagnóstico
+# Perguntas
 if st.session_state.inicio and not st.session_state.finalizado and not st.session_state.area_finalizada:
-    st.image("LOGO REAGRO TRATADA.png", width=150)
     area = st.session_state.area_atual
     aba_excel = "Fertilidade" if area == "Fertilidade" else "Planta Daninha"
     df = pd.read_excel("Teste Chat.xlsx", sheet_name=aba_excel)
@@ -71,11 +75,12 @@ if st.session_state.inicio and not st.session_state.finalizado and not st.sessio
                 st.session_state.pergunta_atual = int(dados["Não"])
             else:
                 st.session_state.area_finalizada = True
+                st.session_state.transicao_pendente = True
                 st.session_state.areas_respondidas.append(area)
-                st.experimental_rerun()  # força recarregamento da interface
+                st.experimental_rerun()
 
-# Botões para próxima área ou finalizar
-if st.session_state.area_finalizada and not st.session_state.finalizado:
+# Transição entre áreas
+if st.session_state.transicao_pendente and not st.session_state.finalizado:
     outras = {"Fertilidade": "Plantas Daninhas", "Plantas Daninhas": "Fertilidade"}
     proxima = outras[st.session_state.area_atual]
     st.markdown(f"### Deseja responder também sobre **{proxima}**?")
@@ -90,11 +95,12 @@ if st.session_state.area_finalizada and not st.session_state.finalizado:
             df_inicio = df_inicio.sort_values("Referência")
             st.session_state.pergunta_atual = int(df_inicio["Referência"].iloc[0])
             st.session_state.area_finalizada = False
+            st.session_state.transicao_pendente = False
     with col2:
         if st.button("❌ Não, finalizar diagnóstico"):
             st.session_state.finalizado = True
 
-# Relatório
+# Relatório final
 if st.session_state.finalizado:
     st.markdown("## ✅ Diagnóstico Concluído")
     mapa = {"Sim": 1, "Não": 0, "Não sei": 0.5}
