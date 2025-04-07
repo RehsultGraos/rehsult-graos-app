@@ -5,6 +5,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from io import BytesIO
 from fpdf import FPDF
+import openai
+
+# CONFIGURAÇÃO DA CHAVE GPT
+openai.api_key = "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"
 
 st.set_page_config(page_title="Rehsult Grãos - Diagnóstico", layout="centered")
 
@@ -21,7 +25,31 @@ if "respostas" not in st.session_state:
 if "areas_respondidas" not in st.session_state:
     st.session_state.areas_respondidas = []
 
-# Tela de entrada
+def gerar_analise_ia(setores_areas):
+    prompt = "Você é um especialista em agronomia. Com base na pontuação percentual por setor abaixo, gere uma análise de pontos de atenção e sugestões de melhoria:
+
+"
+    for area, setores in setores_areas.items():
+        prompt += f"Área: {area}\n"
+        for setor, pct in setores.items():
+            prompt += f"- {setor}: {pct:.1f}%\n"
+        prompt += "\n"
+
+    prompt += "Baseado nesses dados, identifique os setores com menor pontuação e escreva uma análise explicando o que esses resultados indicam e o que pode ser feito para melhorar."
+
+    resposta = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "Você é um consultor agrícola especialista em análise de dados de fazendas."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.7,
+        max_tokens=800
+    )
+
+    return resposta["choices"][0]["message"]["content"]
+
+# Tela inicial
 if not st.session_state.inicio:
     st.image("LOGO REAGRO TRATADA.png", width=200)
     st.title("🌾 Rehsult Grãos - Diagnóstico de Fazenda")
@@ -104,7 +132,7 @@ if st.session_state.decidir_proxima_area and not st.session_state.finalizado:
         st.session_state.finalizado = True
         st.session_state.decidir_proxima_area = False
 
-# Relatório Final
+# Relatório Final com IA
 if st.session_state.finalizado:
     st.markdown("## ✅ Diagnóstico Concluído")
     mapa = {"Sim": 1, "Não": 0, "Não sei": 0.5}
@@ -118,6 +146,7 @@ if st.session_state.finalizado:
     pdf.cell(200, 10, f"Produtividade média SOJA: {st.session_state.get('prod_soja', 0)} kg/ha", ln=True)
     pdf.cell(200, 10, f"Produtividade média MILHO: {st.session_state.get('prod_milho', 0)} kg/ha", ln=True)
 
+    setores_areas = {}
     for area in set(st.session_state.areas_respondidas):
         df_resultado = pd.DataFrame(st.session_state.respostas[area]).T
         if df_resultado.empty:
@@ -125,6 +154,7 @@ if st.session_state.finalizado:
         df_resultado["Score"] = df_resultado["Resposta"].map(mapa) * df_resultado["Peso"]
         setores = df_resultado.groupby("Setor").agg({"Score": "sum", "Peso": "sum"})
         setores["Percentual"] = (setores["Score"] / setores["Peso"]) * 100
+        setores_areas[area] = setores["Percentual"].to_dict()
         nota_area = (df_resultado["Score"].sum() / df_resultado["Peso"].sum()) * 100
 
         st.markdown(f"### 📊 Resultados - {area}")
@@ -143,11 +173,6 @@ if st.session_state.finalizado:
         ax.set_title(f"Radar - {area}")
         st.pyplot(fig)
 
-        st.markdown("**Tópicos a Melhorar:**")
-        pior_setores = setores.sort_values("Percentual").head(3)
-        for setor, linha in pior_setores.iterrows():
-            st.write(f"- {setor}: {linha['Percentual']:.1f}%")
-
         pdf.ln(10)
         pdf.set_font("Arial", "B", 14)
         pdf.cell(200, 10, f"Área Avaliada: {area}", ln=True)
@@ -155,6 +180,22 @@ if st.session_state.finalizado:
         pdf.cell(200, 10, f"Pontuação Geral: {nota_area:.1f}%", ln=True)
         for setor, linha in setores.iterrows():
             pdf.cell(200, 10, f"- {setor}: {linha['Percentual']:.1f}%", ln=True)
+
+    # Análise com IA
+    st.markdown("### 🤖 Análise Inteligente dos Resultados")
+    try:
+        texto_ia = gerar_analise_ia(setores_areas)
+        st.success(texto_ia)
+
+        pdf.ln(10)
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(200, 10, "Análise Inteligente (GPT-4):", ln=True)
+        pdf.set_font("Arial", "", 11)
+        for linha in texto_ia.split("\n"):
+            pdf.multi_cell(0, 10, linha)
+
+    except Exception as e:
+        st.error("Erro ao gerar análise com IA: " + str(e))
 
     pdf_buffer = BytesIO()
     pdf_buffer.write(pdf.output(dest='S').encode('latin1'))
