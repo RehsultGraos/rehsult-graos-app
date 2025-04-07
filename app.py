@@ -72,16 +72,19 @@ if st.session_state.inicio:
 if st.session_state.fim and st.session_state.inicio:
     st.markdown("## ✅ Diagnóstico Concluído")
     df_resultado = pd.DataFrame(st.session_state.respostas).T
+
+    if df_resultado.empty:
+        st.warning("Nenhuma pergunta foi respondida. Por favor, complete o diagnóstico.")
+        st.stop()
+
     mapa = {"Sim": 1, "Não": 0, "Não sei": 0.5}
     df_resultado["Score"] = df_resultado["Resposta"].map(mapa) * df_resultado["Peso"]
 
-    # Resultados por setor
     setores = df_resultado.groupby("Setor").agg({"Score": "sum", "Peso": "sum"})
     setores["Percentual"] = (setores["Score"] / setores["Peso"]) * 100
     nota_area = (df_resultado["Score"].sum() / df_resultado["Peso"].sum()) * 100
     st.markdown(f"### Pontuação na área de {st.session_state.area_escolhida}: **{nota_area:.1f}%**")
 
-    # Radar por setor
     labels = setores.index.tolist()
     valores = setores["Percentual"].tolist()
     valores += valores[:1]
@@ -96,13 +99,11 @@ if st.session_state.fim and st.session_state.inicio:
     ax.set_title(f"Desempenho - {st.session_state.area_escolhida}")
     st.pyplot(fig)
 
-    # Pontuação geral (se quisermos comparar as duas áreas depois)
-    st.markdown("### Tópicos a Melhorar:")
     pior_setores = setores.sort_values("Percentual").head(3)
+    st.markdown("### Tópicos a Melhorar:")
     for setor, linha in pior_setores.iterrows():
         st.write(f"- {setor}: {linha['Percentual']:.1f}%")
 
-    # PDF
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
