@@ -8,7 +8,6 @@ from fpdf import FPDF
 
 st.set_page_config(page_title="Rehsult Grãos - Diagnóstico", layout="centered")
 
-# Inicialização
 if "inicio" not in st.session_state:
     st.session_state.inicio = False
 if "respostas" not in st.session_state:
@@ -24,7 +23,6 @@ if "finalizado" not in st.session_state:
 if "areas_respondidas" not in st.session_state:
     st.session_state.areas_respondidas = []
 
-# Tela inicial
 if not st.session_state.inicio:
     st.image("LOGO REAGRO TRATADA.png", width=200)
     st.title("🌾 Rehsult Grãos - Diagnóstico de Fazenda")
@@ -74,8 +72,9 @@ if st.session_state.inicio and not st.session_state.finalizado and not st.sessio
             else:
                 st.session_state.area_finalizada = True
                 st.session_state.areas_respondidas.append(area)
+                st.experimental_rerun()  # força recarregamento da interface
 
-# Escolher próxima área ou finalizar
+# Botões para próxima área ou finalizar
 if st.session_state.area_finalizada and not st.session_state.finalizado:
     outras = {"Fertilidade": "Plantas Daninhas", "Plantas Daninhas": "Fertilidade"}
     proxima = outras[st.session_state.area_atual]
@@ -91,7 +90,6 @@ if st.session_state.area_finalizada and not st.session_state.finalizado:
             df_inicio = df_inicio.sort_values("Referência")
             st.session_state.pergunta_atual = int(df_inicio["Referência"].iloc[0])
             st.session_state.area_finalizada = False
-        st.session_state.finalizado = False
     with col2:
         if st.button("❌ Não, finalizar diagnóstico"):
             st.session_state.finalizado = True
