@@ -77,9 +77,9 @@ if st.session_state.inicio and not st.session_state.finalizado and not st.sessio
     if ref in perguntas_dict:
         pergunta = perguntas_dict[ref]["Pergunta"]
         peso = perguntas_dict[ref]["Peso"]
-        proxima_sim = perguntas_dict[ref]["Próxima (Sim)"]
-        proxima_nao = perguntas_dict[ref]["Próxima (Não)"]
-        gabarito = perguntas_dict[ref]["Gabarito"]
+        proxima_sim = perguntas_dict[ref]["Sim"]
+        proxima_nao = perguntas_dict[ref]["Não"]
+        gabarito = perguntas_dict[ref]["Sim"]
         setor = perguntas_dict[ref]["Setor"]
 
         resposta = st.radio(pergunta, ["Sim", "Não", "Não sei"], key=f"{area}_{ref}")
@@ -89,9 +89,9 @@ if st.session_state.inicio and not st.session_state.finalizado and not st.sessio
                 "Pergunta": pergunta,
                 "Resposta": resposta,
                 "Peso": peso,
-                "Gabarito": gabarito
+                "Sim": gabarito
             }
-            if (gabarito == "Sim" and resposta == "Sim") or (gabarito == "Não" and resposta == "Não"):
+            if resposta == "Sim":
                 st.session_state.pergunta_atual = int(proxima_sim) if not pd.isna(proxima_sim) else None
             else:
                 st.session_state.pergunta_atual = int(proxima_nao) if not pd.isna(proxima_nao) else None
