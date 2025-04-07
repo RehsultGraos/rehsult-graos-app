@@ -119,9 +119,10 @@ if st.session_state.decidir_proxima_area and not st.session_state.finalizado:
         st.session_state.decidir_proxima_area = False
 
 # Relatório Final
-    st.subheader("🤖 Análise com GPT-4 (simulada)")
+st.subheader("🤖 Análise com GPT-4 (simulada)")
     setores_por_area = {}
-    for area in st.session_state.areas_respondidas:
+    mapa = {'Sim': 1, 'Não': 0, 'Não sei': 0.5}
+for area in st.session_state.areas_respondidas:
         df_area = pd.DataFrame(st.session_state.respostas[area]).T
         if not df_area.empty:
             df_area["Score"] = df_area["Resposta"].map(mapa) * df_area["Peso"]
@@ -193,3 +194,5 @@ if st.session_state.finalizado:
     pdf_buffer.write(pdf.output(dest='S').encode('latin1'))
     pdf_buffer.seek(0)
     st.download_button("📄 Baixar Relatório em PDF", data=pdf_buffer.getvalue(), file_name="relatorio_diagnostico_completo.pdf", mime="application/pdf")
+
+    
