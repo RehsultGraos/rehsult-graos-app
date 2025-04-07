@@ -8,6 +8,7 @@ from fpdf import FPDF
 
 st.set_page_config(page_title="Rehsult Grãos - Diagnóstico", layout="centered")
 
+# Inicialização de sessão
 if "inicio" not in st.session_state:
     st.session_state.inicio = False
 if "respostas" not in st.session_state:
@@ -17,8 +18,9 @@ if "respostas" not in st.session_state:
     st.session_state.fim_area = False
     st.session_state.finalizado = False
     st.session_state.areas_respondidas = []
-    st.session_state.escolheu_proxima_area = False
+    st.session_state.proxima_area_pendente = False
 
+# Tela de entrada
 if not st.session_state.inicio:
     st.image("LOGO REAGRO TRATADA.png", width=200)
     st.title("🌾 Rehsult Grãos - Diagnóstico de Fazenda")
@@ -36,7 +38,8 @@ if not st.session_state.inicio:
         df_inicio = df_inicio.sort_values("Referência")
         st.session_state.pergunta_atual = int(df_inicio["Referência"].iloc[0])
 
-if st.session_state.inicio and not st.session_state.finalizado and not st.session_state.fim_area:
+# Executar perguntas
+if st.session_state.inicio and not st.session_state.finalizado and not st.session_state.proxima_area_pendente:
     st.image("LOGO REAGRO TRATADA.png", width=150)
     area = st.session_state.area_atual
     aba_excel = "Fertilidade" if area == "Fertilidade" else "Planta Daninha"
@@ -66,26 +69,30 @@ if st.session_state.inicio and not st.session_state.finalizado and not st.sessio
             else:
                 st.session_state.fim_area = True
                 st.session_state.areas_respondidas.append(area)
+                st.session_state.proxima_area_pendente = True
 
-if st.session_state.fim_area and not st.session_state.escolheu_proxima_area:
+# Tela intermediária: perguntar se quer responder a outra área
+if st.session_state.proxima_area_pendente and not st.session_state.finalizado:
     outras = {"Fertilidade": "Plantas Daninhas", "Plantas Daninhas": "Fertilidade"}
     proxima = outras[st.session_state.area_atual]
-
     st.markdown(f"### Deseja responder também sobre **{proxima}**?")
-    if st.button(f"Sim, quero responder {proxima}"):
-        st.session_state.area_atual = proxima
-        aba = "Fertilidade" if proxima == "Fertilidade" else "Planta Daninha"
-        df_inicio = pd.read_excel("Teste Chat.xlsx", sheet_name=aba)
-        df_inicio = df_inicio.dropna(subset=["Referência", "Pergunta", "Peso"])
-        df_inicio["Referência"] = df_inicio["Referência"].astype(int)
-        df_inicio = df_inicio.sort_values("Referência")
-        st.session_state.pergunta_atual = int(df_inicio["Referência"].iloc[0])
-        st.session_state.fim_area = False
-        st.session_state.escolheu_proxima_area = False
-    elif st.button("Não, finalizar diagnóstico"):
-        st.session_state.finalizado = True
-        st.session_state.escolheu_proxima_area = True
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button(f"✅ Sim, responder {proxima}"):
+            st.session_state.area_atual = proxima
+            aba = "Fertilidade" if proxima == "Fertilidade" else "Planta Daninha"
+            df_inicio = pd.read_excel("Teste Chat.xlsx", sheet_name=aba)
+            df_inicio = df_inicio.dropna(subset=["Referência", "Pergunta", "Peso"])
+            df_inicio["Referência"] = df_inicio["Referência"].astype(int)
+            df_inicio = df_inicio.sort_values("Referência")
+            st.session_state.pergunta_atual = int(df_inicio["Referência"].iloc[0])
+            st.session_state.fim_area = False
+            st.session_state.proxima_area_pendente = False
+    with col2:
+        if st.button("❌ Não, finalizar diagnóstico"):
+            st.session_state.finalizado = True
 
+# Relatório final
 if st.session_state.finalizado:
     st.markdown("## ✅ Diagnóstico Concluído")
     mapa = {"Sim": 1, "Não": 0, "Não sei": 0.5}
