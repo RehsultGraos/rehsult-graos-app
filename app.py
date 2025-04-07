@@ -16,7 +16,7 @@ if "respostas" not in st.session_state:
     st.session_state.pergunta_atual = 1
     st.session_state.fim = False
 
-# Entrada inicial do usuário
+# Entrada inicial
 if not st.session_state.inicio:
     st.image("LOGO REAGRO TRATADA.png", width=200)
     st.title("🌾 Rehsult Grãos - Diagnóstico de Fazenda")
@@ -37,8 +37,8 @@ if st.session_state.inicio:
     df_fert = pd.read_excel("Teste Chat.xlsx", sheet_name="Fertilidade")
     df_planta = pd.read_excel("Teste Chat.xlsx", sheet_name="Planta Daninha")
     df = pd.concat([df_fert, df_planta], ignore_index=True)
-    df["Nota"] = pd.to_numeric(df["Nota"], errors="coerce")
-    df = df.dropna(subset=["Referência", "Pergunta", "Nota"])
+    df["Peso"] = pd.to_numeric(df["Peso"], errors="coerce")
+    df = df.dropna(subset=["Referência", "Pergunta", "Peso"])
     df["Referência"] = df["Referência"].astype(int)
     perguntas_dict = df.set_index("Referência").to_dict(orient="index")
 
@@ -51,9 +51,11 @@ if st.session_state.inicio:
                 "Setor": dados["Setor"],
                 "Área": dados["Área"],
                 "Pergunta": dados["Pergunta"],
-                "Nota": dados["Nota"],
-                "Resposta": resposta
+                "Peso": dados["Peso"],
+                "Resposta": resposta,
+                "Certa": dados.get("Resposta", "")
             }
+
             if resposta == "Sim" and not pd.isna(dados["Sim"]):
                 st.session_state.pergunta_atual = int(dados["Sim"])
             elif not pd.isna(dados["Não"]):
@@ -63,16 +65,30 @@ if st.session_state.inicio:
     else:
         st.session_state.fim = True
 
-# Finalização do diagnóstico
+# Final do diagnóstico
 if st.session_state.fim and st.session_state.inicio:
     st.markdown("## ✅ Diagnóstico Concluído")
     df_resultado = pd.DataFrame(st.session_state.respostas).T
-    mapa = {"Sim": 1, "Não": 0, "Não sei": 0.5}
-    df_resultado["Score"] = df_resultado["Resposta"].map(mapa) * df_resultado["Nota"]
 
-    setores = df_resultado.groupby("Setor").agg({"Score": "sum", "Nota": "sum"})
-    setores["Percentual"] = (setores["Score"] / setores["Nota"]) * 100
-    nota_geral = (df_resultado["Score"].sum() / df_resultado["Nota"].sum()) * 100
+    # Regras específicas: se resposta da 35 for 'Não', 36, 40 e 41 devem ser tratadas
+    resposta_35 = st.session_state.respostas.get(35, {}).get("Resposta")
+    ignorar_40_41 = resposta_35 == "Não"
+    
+    def aplicar_peso(row):
+        if row.name in [40, 41] and ignorar_40_41:
+            return 0
+        if row.name == 36 and resposta_35 == "Não":
+            return 0
+        return row["Peso"]
+
+    df_resultado["Peso Ajustado"] = df_resultado.apply(aplicar_peso, axis=1)
+
+    mapa = {"Sim": 1, "Não": 0, "Não sei": 0.5}
+    df_resultado["Score"] = df_resultado["Resposta"].map(mapa) * df_resultado["Peso Ajustado"]
+
+    setores = df_resultado.groupby("Setor").agg({"Score": "sum", "Peso Ajustado": "sum"})
+    setores["Percentual"] = (setores["Score"] / setores["Peso Ajustado"]) * 100
+    nota_geral = (df_resultado["Score"].sum() / df_resultado["Peso Ajustado"].sum()) * 100
     st.markdown(f"### Pontuação Geral da Fazenda: **{nota_geral:.1f}%**")
 
     labels = setores.index.tolist()
@@ -94,7 +110,7 @@ if st.session_state.fim and st.session_state.inicio:
     for setor, linha in pior_setores.iterrows():
         st.write(f"- {setor}: {linha['Percentual']:.1f}%")
 
-    # Gerar PDF corretamente
+    # PDF
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
@@ -106,12 +122,10 @@ if st.session_state.fim and st.session_state.inicio:
     pdf.cell(200, 10, f"Produtividade média MILHO: {st.session_state.get('prod_milho', 0)} kg/ha", ln=True)
     pdf.cell(200, 10, f"Pontuação Geral: {nota_geral:.1f}%", ln=True)
     pdf.ln(10)
-
     pdf.cell(200, 10, "Desempenho por Setor:", ln=True)
     for setor, linha in setores.iterrows():
         pdf.cell(200, 10, f"- {setor}: {linha['Percentual']:.1f}%", ln=True)
     pdf.ln(5)
-
     pdf.cell(200, 10, "Tópicos a Melhorar:", ln=True)
     for setor, linha in pior_setores.iterrows():
         pdf.cell(200, 10, f"- {setor}: {linha['Percentual']:.1f}%", ln=True)
