@@ -17,9 +17,9 @@ api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=api_key)
 
 def gerar_analise_ia(setores_areas):
-    prompt = """Você é um especialista em agronomia. Com base na pontuação percentual por setor abaixo, gere uma análise de pontos de atenção e sugestões de melhoria:
+    prompt = '''Você é um especialista em agronomia. Com base na pontuação percentual por setor abaixo, gere uma análise de pontos de atenção e sugestões de melhoria:
 
-"""
+'''
     for area, setores in setores_areas.items():
         prompt += f"Área: {area}\n"
         for setor, pct in setores.items():
@@ -30,7 +30,7 @@ def gerar_analise_ia(setores_areas):
 
     try:
         resposta = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "Você é um consultor agrícola especialista em análise de dados de fazendas."},
                 {"role": "user", "content": prompt}
@@ -43,7 +43,7 @@ def gerar_analise_ia(setores_areas):
         return f"Erro ao gerar análise com IA: {str(e)}"
 
 st.title("🌾 Rehsult Grãos")
-st.markdown("Versão com GPT-4 protegida via .env")
+st.markdown("Versão com GPT-3.5 integrada")
 
 setores_exemplo = {
     "Fertilidade": {"Análise de Solo": 55.0, "Calagem e Gessagem": 42.0, "Macronutrientes": 60.0},
@@ -51,6 +51,6 @@ setores_exemplo = {
 }
 
 if st.button("🧠 Gerar Análise de IA (teste)"):
-    st.markdown("### 🤖 Análise com GPT-4")
+    st.markdown("### 🤖 Análise com GPT-3.5")
     resposta = gerar_analise_ia(setores_exemplo)
     st.write(resposta)
