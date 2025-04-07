@@ -12,7 +12,7 @@ if "inicio" not in st.session_state:
     st.session_state.inicio = False
 if "respostas" not in st.session_state:
     st.session_state.respostas = {}
-    st.session_state.pergunta_atual = 1
+    st.session_state.pergunta_atual = None
     st.session_state.fim = False
 
 if not st.session_state.inicio:
@@ -28,11 +28,16 @@ if not st.session_state.inicio:
     
     if st.button("Iniciar Diagnóstico"):
         st.session_state.inicio = True
+        aba_excel = "Fertilidade" if st.session_state.area_escolhida == "Fertilidade" else "Planta Daninha"
+        df_inicio = pd.read_excel("Teste Chat.xlsx", sheet_name=aba_excel)
+        df_inicio = df_inicio.dropna(subset=["Referência", "Pergunta", "Peso"])
+        df_inicio["Referência"] = df_inicio["Referência"].astype(int)
+        df_inicio = df_inicio.sort_values("Referência")
+        st.session_state.pergunta_atual = int(df_inicio["Referência"].iloc[0])
 
-if st.session_state.inicio:
+if st.session_state.inicio and st.session_state.pergunta_atual:
     st.image("LOGO REAGRO TRATADA.png", width=150)
 
-    # Carregar perguntas da aba correspondente
     area = st.session_state.area_escolhida
     aba_excel = "Fertilidade" if area == "Fertilidade" else "Planta Daninha"
     df = pd.read_excel("Teste Chat.xlsx", sheet_name=aba_excel)
