@@ -1,4 +1,18 @@
 
+def gerar_analise_simulada(setores_areas):
+    return '''✅ Análise com GPT-4 (simulada):
+
+- A área de **Calagem e Gessagem** apresenta baixa pontuação, indicando necessidade de correção de solo.
+- O controle de **plantas daninhas** com pré-emergente está abaixo do ideal.
+- A **adubação** está parcialmente alinhada com as recomendações técnicas.
+
+🎯 Recomendações:
+- Reavaliar a calagem com base nas análises de solo mais recentes.
+- Considerar herbicidas mais eficazes para o início da cultura.
+- Ajustar as doses de macronutrientes com base na produtividade esperada.'''
+
+
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -105,6 +119,25 @@ if st.session_state.decidir_proxima_area and not st.session_state.finalizado:
         st.session_state.decidir_proxima_area = False
 
 # Relatório Final
+    st.subheader("🤖 Análise com GPT-4 (simulada)")
+    setores_por_area = {}
+    for area in st.session_state.areas_respondidas:
+        df_area = pd.DataFrame(st.session_state.respostas[area]).T
+        if not df_area.empty:
+            df_area["Score"] = df_area["Resposta"].map(mapa) * df_area["Peso"]
+            setor_pct = df_area.groupby("Setor").apply(lambda x: round((x["Score"].sum() / x["Peso"].sum()) * 100, 1))
+            setores_por_area[area] = setor_pct.to_dict()
+    analise = gerar_analise_simulada(setores_por_area)
+    st.markdown(analise)
+    pdf.ln(10)
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(200, 10, "Análise Final com GPT-4 (simulada):", ln=True)
+    pdf.set_font("Arial", "", 12)
+    for linha in analise.split("\n"):
+        pdf.multi_cell(0, 10, linha)
+    
+
+
 if st.session_state.finalizado:
     st.markdown("## ✅ Diagnóstico Concluído")
     mapa = {"Sim": 1, "Não": 0, "Não sei": 0.5}
