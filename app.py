@@ -8,7 +8,7 @@ from fpdf import FPDF
 
 st.set_page_config(page_title="Rehsult Grãos - Diagnóstico", layout="centered")
 
-# Iniciar variáveis de controle
+# Inicialização das variáveis de sessão
 if "inicio" not in st.session_state:
     st.session_state.inicio = False
 if "respostas" not in st.session_state:
@@ -16,21 +16,21 @@ if "respostas" not in st.session_state:
     st.session_state.pergunta_atual = 1
     st.session_state.fim = False
 
-# Cabeçalho e entrada de dados só se ainda não começou
+# Entrada inicial do usuário
 if not st.session_state.inicio:
     st.image("LOGO REAGRO TRATADA.png", width=200)
     st.title("🌾 Rehsult Grãos - Diagnóstico de Fazenda")
-    st.markdown("""
-    **Bem-vindo ao Rehsult Grãos!**
-
-    Este é um sistema de diagnóstico para fazendas produtoras de grãos. Você responderá uma pergunta por vez, e ao final, verá um relatório com pontuação geral, gráfico de radar e recomendações.
-    """)
+    st.markdown("Este é um sistema de diagnóstico para fazendas produtoras de grãos. Responda uma pergunta por vez e receba seu relatório completo.")
+    
     st.text_input("Nome da Fazenda", key="fazenda")
     st.text_input("Nome do Responsável", key="responsavel")
+    st.number_input("Produtividade média de SOJA (kg/ha)", min_value=0, key="prod_soja")
+    st.number_input("Produtividade média de MILHO (kg/ha)", min_value=0, key="prod_milho")
+    
     if st.button("Iniciar Diagnóstico"):
         st.session_state.inicio = True
 
-# Diagnóstico após clique
+# Diagnóstico
 if st.session_state.inicio:
     st.image("LOGO REAGRO TRATADA.png", width=150)
 
@@ -89,38 +89,35 @@ if st.session_state.fim and st.session_state.inicio:
     ax.set_title("Desempenho por Setor")
     st.pyplot(fig)
 
-    st.markdown("### Tópicos a Melhorar:")
     pior_setores = setores.sort_values("Percentual").head(3)
+    st.markdown("### Tópicos a Melhorar:")
     for setor, linha in pior_setores.iterrows():
         st.write(f"- {setor}: {linha['Percentual']:.1f}%")
 
-    # PDF
+    # Gerar PDF corretamente
     pdf = FPDF()
     pdf.add_page()
-    pdf.image("LOGO REAGRO TRATADA.png", x=70, y=10, w=70)
-    pdf.set_xy(10, 40)
     pdf.set_font("Arial", "B", 16)
     pdf.cell(190, 10, "Relatório de Diagnóstico - Rehsult Grãos", ln=True, align="C")
     pdf.set_font("Arial", "", 12)
-    pdf.ln(5)
-    fazenda = st.session_state.get("fazenda", "NÃO INFORMADO")
-    pdf.cell(200, 10, f"Fazenda: {fazenda}", ln=True)
-    responsavel = st.session_state.get("responsavel", "NÃO INFORMADO")
-    pdf.cell(200, 10, f"Responsável: {responsavel}", ln=True)
+    pdf.cell(200, 10, f"Fazenda: {st.session_state.get('fazenda', 'NÃO INFORMADO')}", ln=True)
+    pdf.cell(200, 10, f"Responsável: {st.session_state.get('responsavel', 'NÃO INFORMADO')}", ln=True)
+    pdf.cell(200, 10, f"Produtividade média SOJA: {st.session_state.get('prod_soja', 0)} kg/ha", ln=True)
+    pdf.cell(200, 10, f"Produtividade média MILHO: {st.session_state.get('prod_milho', 0)} kg/ha", ln=True)
     pdf.cell(200, 10, f"Pontuação Geral: {nota_geral:.1f}%", ln=True)
     pdf.ln(10)
-    pdf.set_font("Arial", "B", 12)
+
     pdf.cell(200, 10, "Desempenho por Setor:", ln=True)
-    pdf.set_font("Arial", "", 12)
     for setor, linha in setores.iterrows():
         pdf.cell(200, 10, f"- {setor}: {linha['Percentual']:.1f}%", ln=True)
     pdf.ln(5)
-    pdf.set_font("Arial", "B", 12)
+
     pdf.cell(200, 10, "Tópicos a Melhorar:", ln=True)
-    pdf.set_font("Arial", "", 12)
     for setor, linha in pior_setores.iterrows():
         pdf.cell(200, 10, f"- {setor}: {linha['Percentual']:.1f}%", ln=True)
 
     pdf_buffer = BytesIO()
-    pdf.output(pdf_buffer)
+    pdf_buffer.write(pdf.output(dest='S').encode('latin1'))
+    pdf_buffer.seek(0)
+
     st.download_button("📄 Baixar Relatório em PDF", data=pdf_buffer.getvalue(), file_name="relatorio_rehsult_graos.pdf", mime="application/pdf")
