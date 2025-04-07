@@ -41,6 +41,7 @@ if "respostas" not in st.session_state:
     st.session_state.finalizado = False
     st.session_state.decidir_proxima_area = False
 if "areas_respondidas" not in st.session_state:
+    st.session_state.mostrar_opcao_proxima_area = False
     st.session_state.areas_respondidas = []
 
 # TELA INICIAL
@@ -99,10 +100,9 @@ if st.session_state.inicio and not st.session_state.finalizado and not st.sessio
             if st.session_state.pergunta_atual is None:
                 st.session_state.areas_respondidas.append(area)
                 st.session_state.decidir_proxima_area = True
-st.experimental_rerun()
 
 # MUDAR DE ÁREA OU FINALIZAR
-if st.session_state.decidir_proxima_area:
+if st.session_state.decidir_proxima_area and st.session_state.mostrar_opcao_proxima_area:
     st.success(f"Área {st.session_state.area_atual} finalizada!")
     proxima = [a for a in ["Fertilidade", "Plantas Daninhas"] if a not in st.session_state.areas_respondidas]
     if proxima:
