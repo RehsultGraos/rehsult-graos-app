@@ -76,7 +76,9 @@ if st.session_state.inicio and not st.session_state.finalizado and not st.sessio
 
 # Transição entre áreas
 if st.session_state.decidir_proxima_area and not st.session_state.finalizado:
-    st.session_state.areas_respondidas.append(st.session_state.area_atual)
+    if st.session_state.area_atual not in st.session_state.areas_respondidas:
+        st.session_state.areas_respondidas.append(st.session_state.area_atual)
+
     outras = {"Fertilidade": "Plantas Daninhas", "Plantas Daninhas": "Fertilidade"}
     proxima = outras[st.session_state.area_atual]
 
@@ -116,7 +118,7 @@ if st.session_state.finalizado:
     pdf.cell(200, 10, f"Produtividade média SOJA: {st.session_state.get('prod_soja', 0)} kg/ha", ln=True)
     pdf.cell(200, 10, f"Produtividade média MILHO: {st.session_state.get('prod_milho', 0)} kg/ha", ln=True)
 
-    for area in st.session_state.areas_respondidas:
+    for area in set(st.session_state.areas_respondidas):
         df_resultado = pd.DataFrame(st.session_state.respostas[area]).T
         if df_resultado.empty:
             continue
