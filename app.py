@@ -17,6 +17,7 @@ if "respostas" not in st.session_state:
     st.session_state.area_atual = None
     st.session_state.fim_area = False
     st.session_state.finalizado = False
+    st.session_state.decidir_proxima_area = False
 if "areas_respondidas" not in st.session_state:
     st.session_state.areas_respondidas = []
 
@@ -39,7 +40,7 @@ if not st.session_state.inicio:
         st.session_state.pergunta_atual = int(df_inicio["Referência"].iloc[0])
 
 # Diagnóstico
-if st.session_state.inicio and not st.session_state.finalizado:
+if st.session_state.inicio and not st.session_state.finalizado and not st.session_state.decidir_proxima_area:
     st.image("LOGO REAGRO TRATADA.png", width=150)
     area = st.session_state.area_atual
     aba_excel = "Fertilidade" if area == "Fertilidade" else "Planta Daninha"
@@ -68,29 +69,38 @@ if st.session_state.inicio and not st.session_state.finalizado:
                 st.session_state.pergunta_atual = int(dados["Não"])
             else:
                 st.session_state.fim_area = True
+                st.session_state.decidir_proxima_area = True
     else:
         st.session_state.fim_area = True
+        st.session_state.decidir_proxima_area = True
 
 # Transição entre áreas
-if st.session_state.fim_area and not st.session_state.finalizado:
+if st.session_state.decidir_proxima_area and not st.session_state.finalizado:
     st.session_state.areas_respondidas.append(st.session_state.area_atual)
     outras = {"Fertilidade": "Plantas Daninhas", "Plantas Daninhas": "Fertilidade"}
     proxima = outras[st.session_state.area_atual]
 
     if proxima not in st.session_state.areas_respondidas:
-        if st.button(f"Deseja responder também sobre {proxima}?"):
-            st.session_state.area_atual = proxima
-            aba = "Fertilidade" if proxima == "Fertilidade" else "Planta Daninha"
-            df_inicio = pd.read_excel("Teste Chat.xlsx", sheet_name=aba)
-            df_inicio = df_inicio.dropna(subset=["Referência", "Pergunta", "Peso"])
-            df_inicio["Referência"] = df_inicio["Referência"].astype(int)
-            df_inicio = df_inicio.sort_values("Referência")
-            st.session_state.pergunta_atual = int(df_inicio["Referência"].iloc[0])
-            st.session_state.fim_area = False
-        else:
-            st.session_state.finalizado = True
+        st.markdown(f"### Deseja responder também sobre **{proxima}**?")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("✅ Sim"):
+                st.session_state.area_atual = proxima
+                aba = "Fertilidade" if proxima == "Fertilidade" else "Planta Daninha"
+                df_inicio = pd.read_excel("Teste Chat.xlsx", sheet_name=aba)
+                df_inicio = df_inicio.dropna(subset=["Referência", "Pergunta", "Peso"])
+                df_inicio["Referência"] = df_inicio["Referência"].astype(int)
+                df_inicio = df_inicio.sort_values("Referência")
+                st.session_state.pergunta_atual = int(df_inicio["Referência"].iloc[0])
+                st.session_state.fim_area = False
+                st.session_state.decidir_proxima_area = False
+        with col2:
+            if st.button("❌ Não"):
+                st.session_state.finalizado = True
+                st.session_state.decidir_proxima_area = False
     else:
         st.session_state.finalizado = True
+        st.session_state.decidir_proxima_area = False
 
 # Relatório Final
 if st.session_state.finalizado:
@@ -118,7 +128,6 @@ if st.session_state.finalizado:
         st.markdown(f"### 📊 Resultados - {area}")
         st.markdown(f"**Pontuação Geral:** {nota_area:.1f}%")
 
-        # Radar
         labels = setores.index.tolist()
         valores = setores["Percentual"].tolist()
         valores += valores[:1]
