@@ -8,7 +8,6 @@ from fpdf import FPDF
 
 st.set_page_config(page_title="Rehsult Grãos - Diagnóstico", layout="centered")
 
-# Inicialização
 if "inicio" not in st.session_state:
     st.session_state.inicio = False
 if "respostas" not in st.session_state:
@@ -16,7 +15,6 @@ if "respostas" not in st.session_state:
     st.session_state.pergunta_atual = 1
     st.session_state.fim = False
 
-# Tela inicial
 if not st.session_state.inicio:
     st.image("LOGO REAGRO TRATADA.png", width=200)
     st.title("🌾 Rehsult Grãos - Diagnóstico de Fazenda")
@@ -31,15 +29,14 @@ if not st.session_state.inicio:
     if st.button("Iniciar Diagnóstico"):
         st.session_state.inicio = True
 
-# Diagnóstico
 if st.session_state.inicio:
     st.image("LOGO REAGRO TRATADA.png", width=150)
 
-    df_fert = pd.read_excel("Teste Chat.xlsx", sheet_name="Fertilidade")
-    df_planta = pd.read_excel("Teste Chat.xlsx", sheet_name="Planta Daninha")
-
+    # Carregar perguntas da aba correspondente
     area = st.session_state.area_escolhida
-    df = df_fert if area == "Fertilidade" else df_planta
+    aba_excel = "Fertilidade" if area == "Fertilidade" else "Planta Daninha"
+    df = pd.read_excel("Teste Chat.xlsx", sheet_name=aba_excel)
+
     df["Peso"] = pd.to_numeric(df["Peso"], errors="coerce")
     df = df.dropna(subset=["Referência", "Pergunta", "Peso"])
     df["Referência"] = df["Referência"].astype(int)
@@ -68,7 +65,6 @@ if st.session_state.inicio:
     else:
         st.session_state.fim = True
 
-# Finalização
 if st.session_state.fim and st.session_state.inicio:
     st.markdown("## ✅ Diagnóstico Concluído")
     df_resultado = pd.DataFrame(st.session_state.respostas).T
