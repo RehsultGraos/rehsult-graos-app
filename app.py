@@ -119,6 +119,18 @@ if st.session_state.decidir_proxima_area and not st.session_state.finalizado:
         st.session_state.decidir_proxima_area = False
 
 # Relatório Final
+
+    st.subheader("🤖 Análise com GPT-4 (simulada)")
+    analise = gerar_analise_simulada(setores_por_area)
+    st.markdown(analise)
+    pdf.set_font("Arial", "B", 14)
+    pdf.ln(10)
+    pdf.cell(200, 10, "Análise com GPT-4 (simulada):", ln=True)
+    pdf.set_font("Arial", "", 12)
+    for linha in analise.split("\n"):
+        pdf.multi_cell(0, 10, linha)
+
+
 if st.session_state.finalizado:
     st.markdown("## ✅ Diagnóstico Concluído")
     mapa = {"Sim": 1, "Não": 0, "Não sei": 0.5}
