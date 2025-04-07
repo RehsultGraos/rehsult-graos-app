@@ -1,156 +1,106 @@
 
 import streamlit as st
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-from io import BytesIO
 from fpdf import FPDF
+from io import BytesIO
 import base64
 
-st.set_page_config(page_title="Rehsult Grãos", layout="centered")
-
-st.image("LOGO REAGRO TRATADA.png", width=180)
-
-st.title("🌾 Rehsult Grãos")
-st.markdown("Versão com GPT-4 (simulada) integrada ao diagnóstico")
-
-@st.cache_data
-def carregar_planilha():
-    return pd.read_excel("Teste Chat.xlsx", sheet_name=None)
-
-def gerar_grafico_radar(setores_dict, titulo):
-    categorias = list(setores_dict.keys())
-    valores = list(setores_dict.values())
-    valores += valores[:1]
-    categorias += categorias[:1]
-
-    angles = np.linspace(0, 2 * np.pi, len(categorias), endpoint=False).tolist()
-    angles += angles[:1]
-
-    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
-    ax.fill(angles, valores, alpha=0.25)
-    ax.plot(angles, valores, linewidth=2)
-
-    ax.set_yticklabels([])
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(categorias)
-    ax.set_title(titulo, y=1.1)
-    st.pyplot(fig)
-
+# Função para gerar análise simulada
 def gerar_analise_simulada(setores_areas):
-    pontos = []
-    recomendacoes = []
-
+    analise = "### 🤖 Análise com GPT-4 (simulada)\n\n"
+    analise += "**✅ Análise Simulada:**\n\n"
     for area, setores in setores_areas.items():
         for setor, pct in setores.items():
             if pct < 50:
-                pontos.append(f"A área de **{setor}** apresenta baixa pontuação, indicando necessidade de atenção.")
-                recomendacoes.append(f"- Rever o manejo de **{setor}** na área de **{area}**.")
+                analise += f"- A área de **{setor}** na categoria **{area}** apresenta baixa pontuação, indicando necessidade de atenção.\n"
             elif pct < 75:
-                pontos.append(f"O setor de **{setor}** está razoável, mas pode ser otimizado.")
-                recomendacoes.append(f"- Avaliar oportunidades de melhoria em **{setor}**.")
-
-    analise = "### ✅ Análise com GPT-4 (simulada):\n"
-    analise += "\n".join([f"- {p}" for p in pontos]) + "\n\n"
-    analise += "### 🎯 Recomendações:\n"
-    analise += "\n".join(recomendacoes)
-
+                analise += f"- O setor de **{setor}** em **{area}** possui desempenho mediano, com possibilidade de melhoria.\n"
+            else:
+                analise += f"- O setor **{setor}** em **{area}** está com bom desempenho.\n"
+    analise += "\n🎯 **Recomendações:**\n"
+    analise += "- Revisar práticas de manejo e protocolos técnicos.\n"
+    analise += "- Considerar consultoria especializada para áreas com menor desempenho.\n"
     return analise
 
-dados = carregar_planilha()
-perguntas_dict = {}
-setores = {}
+# Leitura da planilha e limpeza dos nomes das colunas
+df = pd.read_excel("Teste Chat.xlsx", sheet_name=None)
+df_fert = df["Fertilidade"]
+df_daninha = df["Plantas Daninhas"]
+df_fert.columns = df_fert.columns.str.strip()
+df_daninha.columns = df_daninha.columns.str.strip()
 
-for aba, df in dados.items():
-    for _, row in df.iterrows():
-        perguntas_dict[row["ID"]] = row.to_dict()
-        setores[row["ID"]] = aba
+# Montar dicionário com perguntas
+def carregar_perguntas(df_area):
+    perguntas = {}
+    for _, row in df_area.iterrows():
+        perguntas[str(row["ID"]).strip()] = row.to_dict()
+    return perguntas
 
+# Função de relatório em PDF (simplificada)
+def gerar_pdf_simples(analise):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.multi_cell(0, 10, analise)
+    buffer = BytesIO()
+    pdf.output(buffer)
+    buffer.seek(0)
+    return buffer
+
+# Streamlit interface
+st.set_page_config(page_title="Rehsult Grãos", layout="centered")
+st.image("LOGO REAGRO TRATADA.png", width=200)
+st.title("Rehsult Grãos")
+st.markdown("Versão com GPT-4 (simulada) integrada ao diagnóstico")
+
+if "area_atual" not in st.session_state:
+    st.session_state.area_atual = None
 if "respostas" not in st.session_state:
     st.session_state.respostas = {}
-if "pagina" not in st.session_state:
-    st.session_state.pagina = "inicio"
-if "area_atual" not in st.session_state:
-    st.session_state.area_atual = ""
-if "respondidas" not in st.session_state:
-    st.session_state.respondidas = []
-if "areas_respondidas" not in st.session_state:
-    st.session_state.areas_respondidas = []
+if "pergunta_atual" not in st.session_state:
+    st.session_state.pergunta_atual = "1"
 
-def responder(pergunta_id, resposta):
-    st.session_state.respostas[pergunta_id] = resposta
-    st.session_state.respondidas.append(pergunta_id)
-    proxima = perguntas_dict[pergunta_id][f"Próxima ({resposta})"]
-    if pd.isna(proxima):
-        st.session_state.pagina = "outra_area"
-    else:
-        st.session_state.pagina = proxima
+area = st.radio("Qual área deseja avaliar?", ["Fertilidade", "Plantas Daninhas"])
 
-if st.session_state.pagina == "inicio":
-    st.subheader("Qual área deseja avaliar?")
-    area = st.radio("Escolha uma área:", list(dados.keys()))
-    if st.button("Iniciar Diagnóstico"):
-        st.session_state.area_atual = area
-        primeira = dados[area].iloc[0]["ID"]
-        st.session_state.pagina = primeira
-        st.session_state.areas_respondidas.append(area)
+df_area = df_fert if area == "Fertilidade" else df_daninha
+perguntas_dict = carregar_perguntas(df_area)
 
-elif st.session_state.pagina in perguntas_dict:
-    pergunta = perguntas_dict[st.session_state.pagina]
-    st.subheader(pergunta["Pergunta"])
-    col1, col2, col3 = st.columns(3)
-    if col1.button("✅ Sim"):
-        responder(pergunta["ID"], "Sim")
-    if col2.button("❌ Não"):
-        responder(pergunta["ID"], "Não")
-    if col3.button("🤔 Não sei"):
-        responder(pergunta["ID"], "Não sei")
+# Lógica de perguntas
+if st.session_state.pergunta_atual in perguntas_dict:
+    pergunta = perguntas_dict[st.session_state.pergunta_atual]
+    st.markdown(f"**{pergunta['Pergunta']}**")
+    resposta = st.radio("Selecione:", ["Sim", "Não", "Não sei"], key=st.session_state.pergunta_atual)
+    if st.button("Próxima"):
+        st.session_state.respostas[st.session_state.pergunta_atual] = resposta
+        proxima = str(pergunta["Próxima (Sim)"]) if resposta == "Sim" else str(pergunta["Próxima (Não)"])
+        if proxima.lower() != "nan":
+            st.session_state.pergunta_atual = proxima
+        else:
+            st.session_state.pergunta_atual = None
 
-elif st.session_state.pagina == "outra_area":
-    areas_disponiveis = [a for a in dados.keys() if a not in st.session_state.areas_respondidas]
-    if areas_disponiveis:
-        nova_area = areas_disponiveis[0]
-        st.subheader(f"Deseja responder também sobre {nova_area}?")
-        col1, col2 = st.columns(2)
-        if col1.button("✅ Sim"):
-            st.session_state.area_atual = nova_area
-            primeira = dados[nova_area].iloc[0]["ID"]
-            st.session_state.pagina = primeira
-            st.session_state.areas_respondidas.append(nova_area)
-            st.rerun()
-        if col2.button("❌ Não"):
-            st.session_state.pagina = "relatorio"
-            st.rerun()
-    else:
-        st.session_state.pagina = "relatorio"
-        st.rerun()
-
-elif st.session_state.pagina == "relatorio":
+# Relatório final
+if st.session_state.pergunta_atual is None:
     st.success("✅ Diagnóstico Concluído")
+    df_resultado = df_area[df_area["ID"].astype(str).isin(st.session_state.respostas.keys())].copy()
+    df_resultado["Resposta"] = df_resultado["ID"].astype(str).map(st.session_state.respostas)
+    mapa = {"Sim": 1, "Não": 0, "Não sei": 0.5}
+    df_resultado["Score"] = df_resultado["Resposta"].map(mapa) * df_resultado["Peso"]
+    
+    setor_scores = df_resultado.groupby("Setor")["Score"].sum()
+    setor_pesos = df_resultado.groupby("Setor")["Peso"].sum()
+    radar_data = (setor_scores / setor_pesos * 100).fillna(0)
+    
+    setores_por_area = {area: radar_data.to_dict()}
 
-    respostas_df = pd.DataFrame([
-        {"ID": k, "Resposta": v, "Área": setores[k]}
-        for k, v in st.session_state.respostas.items()
-    ])
-    respostas_df = respostas_df.merge(
-        pd.concat(dados.values()), on="ID"
-    )
+    st.markdown("## 📊 Resultados")
+    st.write(radar_data)
 
-    setores_por_area = {}
-    for area in st.session_state.areas_respondidas:
-        df_area = respostas_df[respostas_df["Área"] == area]
-        mapa = {"Sim": 1, "Não": 0, "Não sei": 0.5}
-        df_area["Score"] = df_area["Resposta"].map(mapa) * df_area["Peso"]
-        setores_score = df_area.groupby("Setor")["Score"].sum()
-        setores_peso = df_area.groupby("Setor")["Peso"].sum()
-        setores_pct = (setores_score / setores_peso * 100).to_dict()
-        setores_por_area[area] = setores_pct
-
-        st.subheader(f"📊 Resultados - {area}")
-        st.markdown(f"**Pontuação Geral:** {sum(df_area['Score']) / sum(df_area['Peso']) * 100:.1f}%")
-        gerar_grafico_radar(setores_pct, f"Radar - {area}")
-
-    # 🔍 Análise simulada (com GPT-4 falso)
-    st.subheader("🤖 Análise com GPT-4 (simulada)")
+    # Gerar Análise com GPT-4 (Simulada)
     analise = gerar_analise_simulada(setores_por_area)
+    st.markdown("---")
     st.markdown(analise)
+
+    # PDF download
+    pdf_buffer = gerar_pdf_simples(analise)
+    st.download_button("📄 Baixar Relatório PDF", data=pdf_buffer, file_name="relatorio_diagnostico.pdf")
