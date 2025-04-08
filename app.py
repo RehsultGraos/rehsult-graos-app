@@ -28,7 +28,7 @@ def gerar_grafico_radar(setores, titulo):
     st.pyplot(fig)
 
 def gerar_analise_simulada(setores_areas):
-    texto = "Analise GPT-4: **Análise com GPT-4 (simulada)**
+    texto = "Analise GPT-4: **Análise com GPT-4 (simulada)**\n\n"
 
 "
     texto += "Diagnóstico Concluído: **Análise Simulada:**
