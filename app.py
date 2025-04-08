@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from fpdf import FPDF
 from io import BytesIO
 from math import pi
+import unicodedata
 
 st.set_page_config(page_title="Rehsult Grãos", layout="centered")
 st.title("🌱 Rehsult Grãos")
@@ -17,9 +18,10 @@ abas = list(df.keys())
 
 # Inicializar estado
 if "estado" not in st.session_state:
-    st.session_state.estado = "inicio"
+    st.session_state.estado = "dados_iniciais"
     st.session_state.respostas = {}
     st.session_state.areas_respondidas = []
+    st.session_state.dados_iniciais = {}
 
 # Funções
 def gerar_grafico_radar(setores, area):
@@ -52,37 +54,57 @@ def gerar_analise_simulada(setores_areas):
     for area, setores in setores_areas.items():
         for setor, nota in setores.items():
             if nota < 50:
-                texto += f"- O setor **{setor}** em **{area}** apresenta baixa pontuação. Avaliar ações corretivas.\n"
+                texto += f"- O setor {setor} em {area} apresenta baixa pontuação. Avaliar ações corretivas.\n"
             elif nota < 75:
-                texto += f"- O setor **{setor}** em **{area}** está mediano. Há espaço para ajustes.\n"
+                texto += f"- O setor {setor} em {area} está mediano. Há espaço para ajustes.\n"
             else:
-                texto += f"- O setor **{setor}** em **{area}** apresenta bom desempenho.\n"
-    texto += "\n🎯 **Recomendações:**\n- Revisar práticas nos setores com desempenho fraco.\n- Otimizar os setores intermediários.\n"
+                texto += f"- O setor {setor} em {area} apresenta bom desempenho.\n"
+    texto += "\n🎯 Recomendações:\n- Revisar práticas nos setores com desempenho fraco.\n- Otimizar os setores intermediários.\n"
     return texto
 
-def gerar_pdf(analise, setores_areas):
+def gerar_pdf(analise, setores_areas, dados_iniciais):
+    def limpar(texto):
+        return unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
+
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
+
+    pdf.cell(200, 10, f"Nome da Fazenda: {limpar(dados_iniciais.get('nome', ''))}", ln=True)
+    pdf.cell(200, 10, f"Produtividade Soja: {dados_iniciais.get('soja', '')} sc/ha", ln=True)
+    pdf.cell(200, 10, f"Produtividade Milho: {dados_iniciais.get('milho', '')} sc/ha", ln=True)
+    pdf.ln(5)
+
     for area, setores in setores_areas.items():
         pdf.set_font("Arial", 'B', 12)
-        pdf.cell(200, 10, f"Área: {area}", ln=True)
+        pdf.cell(200, 10, f"Área: {limpar(area)}", ln=True)
         pdf.set_font("Arial", size=12)
         for setor, val in setores.items():
-            pdf.cell(200, 10, f"{setor}: {val:.1f}%", ln=True)
+            pdf.cell(200, 10, f"{limpar(setor)}: {val:.1f}%", ln=True)
         pdf.ln(5)
+
     pdf.set_font("Arial", 'B', 12)
     pdf.cell(200, 10, "Análise GPT-4 (simulada)", ln=True)
     pdf.set_font("Arial", size=12)
     for linha in analise.split("\n"):
-        pdf.multi_cell(0, 10, linha)
+        pdf.multi_cell(0, 10, limpar(linha))
 
     pdf_bytes = pdf.output(dest='S').encode('latin1')
     buffer = BytesIO(pdf_bytes)
     return buffer
 
-# Etapas do app
-if st.session_state.estado == "inicio":
+# Etapas
+if st.session_state.estado == "dados_iniciais":
+    st.subheader("Dados Iniciais da Fazenda")
+    nome = st.text_input("Nome da Fazenda")
+    soja = st.number_input("Produtividade média de Soja (sc/ha)", min_value=0.0, format="%.1f")
+    milho = st.number_input("Produtividade média de Milho (sc/ha)", min_value=0.0, format="%.1f")
+    if st.button("Iniciar Diagnóstico"):
+        st.session_state.dados_iniciais = {"nome": nome, "soja": soja, "milho": milho}
+        st.session_state.estado = "inicio"
+        st.experimental_rerun()
+
+elif st.session_state.estado == "inicio":
     st.subheader("Qual área deseja começar?")
     area_escolhida = st.radio("", [a for a in abas if a not in st.session_state.areas_respondidas])
     if st.button("Iniciar Diagnóstico"):
@@ -140,5 +162,5 @@ elif st.session_state.estado == "relatorio":
     st.markdown("---")
     analise = gerar_analise_simulada(setores_areas)
     st.markdown(analise)
-    pdf = gerar_pdf(analise, setores_areas)
+    pdf = gerar_pdf(analise, setores_areas, st.session_state.dados_iniciais)
     st.download_button("📄 Baixar PDF do Diagnóstico", data=pdf, file_name="relatorio_rehsult.pdf")
