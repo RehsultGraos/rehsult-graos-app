@@ -161,7 +161,7 @@ elif len(st.session_state.areas_respondidas) == len(dados):
         st.markdown(f"**Pontuação Geral:** {media:.1f} pontos")
         gerar_grafico_radar(setores, area)
 
-    analise = "✅ Análise Simulada:
+    analise = """✅ Análise Simulada:\n
 "
     for area, setores in resultado.items():
         for setor, valor in setores.items():
@@ -175,8 +175,7 @@ elif len(st.session_state.areas_respondidas) == len(dados):
                 analise += f"- O setor {setor} em {area} está com bom desempenho.
 "
     analise += "
-🎯 Recomendações:
-- Revisar práticas nos setores com baixa pontuação."
+🎯 Recomendações:\n- Revisar práticas nos setores com baixa pontuação."""
 
     st.markdown("### 🤖 Análise Simulada")
     st.markdown(analise)
