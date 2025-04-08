@@ -1,107 +1,162 @@
-
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from fpdf import FPDF
-import os
 from io import BytesIO
+from math import pi
 
-# Função para gerar PDF corrigida com fpdf2
+st.set_page_config(page_title="Rehsult Grãos", layout="centered")
+st.image("LOGO REAGRO TRATADA.png", width=200)
 
-def gerar_pdf(analise, setores):
-    from fpdf import FPDF
+st.title("Rehsult Grãos")
+st.markdown("Diagnóstico de fazendas produtoras de grãos com análise simulada GPT-4")
+
+# ---------- ETAPA INICIAL ----------
+if "estado" not in st.session_state:
+    st.session_state.estado = "dados_iniciais"
+    st.session_state.respostas = {}
+    st.session_state.areas_respondidas = []
+    st.session_state.dados_iniciais = {}
+
+# ---------- FUNÇÕES AUXILIARES ----------
+def gerar_grafico_radar(setores, area):
+    setores = {k: v for k, v in setores.items() if pd.notnull(v)}
+    if len(setores) < 3:
+        st.warning(f"Não há dados suficientes para gerar o gráfico de {area}.")
+        return
+
+    categorias = list(setores.keys())
+    valores = list(setores.values())
+    valores += valores[:1]
+    N = len(categorias)
+    angulos = [n / float(N) * 2 * pi for n in range(N)]
+    angulos += angulos[:1]
+
+    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+    ax.set_theta_offset(pi / 2)
+    ax.set_theta_direction(-1)
+    ax.set_xticks(angulos[:-1])
+    ax.set_xticklabels(categorias)
+    ax.set_rlabel_position(0)
+    ax.plot(angulos, valores, marker='o')
+    ax.fill(angulos, valores, alpha=0.3)
+    ax.set_title(f"Radar - {area}")
+    st.pyplot(fig)
+
+def gerar_analise_simulada(setores_areas):
+    texto = "Analise GPT-4 (simulada):\n\n"
+    for area, setores in setores_areas.items():
+        for setor, nota in setores.items():
+            if nota < 50:
+                texto += f"- O setor {setor} em {area} apresenta baixa pontuação.\n"
+            elif nota < 75:
+                texto += f"- O setor {setor} em {area} está mediano.\n"
+            else:
+                texto += f"- O setor {setor} em {area} apresenta bom desempenho.\n"
+    texto += "\nRecomendações:\n- Revisar práticas nos setores com desempenho fraco.\n- Otimizar os setores intermediários.\n"
+    return texto
+
+def gerar_pdf(analise, setores_areas, dados_iniciais):
+    def limpar(texto):
+        return str(texto).encode("latin-1", "replace").decode("latin-1")
 
     pdf = FPDF()
     pdf.add_page()
-    pdf.add_font("DejaVu", '', "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", uni=True)
-    pdf.set_font("DejaVu", size=12)
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, limpar(f"Nome da Fazenda: {dados_iniciais.get('nome', '')}"), ln=True)
+    pdf.cell(200, 10, limpar(f"Produtividade Soja: {dados_iniciais.get('soja', '')} sc/ha"), ln=True)
+    pdf.cell(200, 10, limpar(f"Produtividade Milho: {dados_iniciais.get('milho', '')} sc/ha"), ln=True)
+    pdf.ln(5)
 
-    pdf.multi_cell(0, 10, "Analise com GPT-4 (simulada):\n")
-    pdf.multi_cell(0, 10, analise)
+    for area, setores in setores_areas.items():
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(200, 10, limpar(f"Área: {area}"), ln=True)
+        pdf.set_font("Arial", size=12)
+        for setor, val in setores.items():
+            pdf.cell(200, 10, limpar(f"{setor}: {val:.1f}%"), ln=True)
+        pdf.ln(5)
 
-    pdf.output("/mnt/data/diagnostico_completo_corrigido.pdf")
-    return "/mnt/data/diagnostico_completo_corrigido.pdf"
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(200, 10, limpar("Análise GPT-4 (simulada)"), ln=True)
+    pdf.set_font("Arial", size=12)
+    for linha in analise.split("\n"):
+        pdf.multi_cell(0, 10, limpar(linha))
 
-# Carregamento da planilha
-df = pd.read_excel("Teste Chat.xlsx")
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    return BytesIO(pdf_bytes)
 
-# Função para identificar a próxima pergunta
+# ---------- FLUXO DO APP ----------
+df = pd.read_excel("Teste Chat.xlsx", sheet_name=None)
+abas = list(df.keys())
 
-def obter_proxima_id(resposta, linha_atual):
-    return linha_atual["Próxima (Sim)" if resposta == "Sim" else "Próxima (Não)"]
+if st.session_state.estado == "dados_iniciais":
+    st.subheader("Dados Iniciais da Fazenda")
+    nome = st.text_input("Nome da Fazenda")
+    soja = st.number_input("Produtividade média de Soja (sc/ha)", min_value=0.0, format="%.1f")
+    milho = st.number_input("Produtividade média de Milho (sc/ha)", min_value=0.0, format="%.1f")
+    if st.button("Iniciar Diagnóstico"):
+        st.session_state.dados_iniciais = {"nome": nome, "soja": soja, "milho": milho}
+        st.session_state.estado = "inicio"
+        st.rerun()
 
-# Inicializa o estado da aplicação
-if "pergunta_id" not in st.session_state:
-    st.session_state.pergunta_id = df.iloc[0]["Referência"]
-    st.session_state.respostas = {}
-    st.session_state.area_atual = df.iloc[0]["Área"]
-    st.session_state.encerrar = False
+elif st.session_state.estado == "inicio":
+    st.subheader("Qual área deseja começar?")
+    area_escolhida = st.radio("", [a for a in abas if a not in st.session_state.areas_respondidas])
+    if st.button("Iniciar Diagnóstico"):
+        st.session_state.area_atual = area_escolhida
+        st.session_state.pergunta_idx = 0
+        st.session_state.estado = "perguntas"
 
-# Interface
-st.image("LOGO REAGRO TRATADA.png", width=150)
-st.title("Rehsult Grãos")
-st.caption("Diagnóstico de fazendas produtoras de grãos com análise simulada GPT-4")
-
-if not st.session_state.encerrar:
-    linha = df[df["Referência"] == st.session_state.pergunta_id]
-
-    if not linha.empty:
-        linha = linha.iloc[0]
-
-        # Verifica dependência
-        dependente = linha.get("Exibir se Sim de")
-        if pd.notna(dependente):
-            resposta_dependente = st.session_state.respostas.get(dependente, {}).get("Resposta")
-            if resposta_dependente != "Sim":
-                st.session_state.pergunta_id = obter_proxima_id("Sim", linha)  # Ignora se dependência não cumprida
-                st.rerun()
-
-        st.subheader(f"{linha['Setor']} - {linha['Pergunta']}")
-        resposta = st.radio("Selecione a resposta:", ["Sim", "Não", "Não sei"])
-
-        if st.button("Responder"):
-            st.session_state.respostas[linha["Referência"]] = {
-                "Resposta": resposta,
-                "Setor": linha["Setor"],
-                "Peso": linha["Peso"],
-                "Correta": linha["Resposta Correta"]
-            }
-            proxima_id = obter_proxima_id(resposta, linha)
-            if pd.isna(proxima_id):
-                st.session_state.encerrar = True
-            else:
-                st.session_state.pergunta_id = proxima_id
-            st.rerun()
-else:
-    st.success("Diagnóstico parcial concluído.")
-
-    respostas_df = pd.DataFrame.from_dict(st.session_state.respostas, orient="index")
-    respostas_df["Score"] = respostas_df.apply(
-        lambda x: x["Peso"] if str(x["Resposta"]).strip() == str(x["Correta"]).strip() else 0, axis=1
-    )
-
-    setores = respostas_df.groupby("Setor")["Score"].sum().to_dict()
-    total = respostas_df["Score"].sum()
-
-    st.write("\n\n### Resultados por Setor")
-    for setor, score in setores.items():
-        st.write(f"- **{setor}**: {score:.1f} pontos")
-
-    # Análise simulada
-    analise = ""
-    for setor, score in setores.items():
-        if score < 2:
-            analise += f"O setor {setor} apresenta baixa pontuação.\n"
-        elif score < 4:
-            analise += f"O setor {setor} está razoável, pode melhorar.\n"
+elif st.session_state.estado == "perguntas":
+    area = st.session_state.area_atual
+    perguntas = df[area].dropna(subset=["Pergunta"]).reset_index(drop=True)
+    linha = perguntas.iloc[st.session_state.pergunta_idx]
+    st.markdown(f"**{linha['Pergunta']}**")
+    resposta = st.radio("Selecione:", ["Sim", "Não", "Não sei"], key=f"resp_{st.session_state.pergunta_idx}")
+    if st.button("Responder"):
+        st.session_state.respostas.setdefault(area, []).append((linha["Setor"], resposta, linha["Peso"]))
+        if st.session_state.pergunta_idx + 1 < len(perguntas):
+            st.session_state.pergunta_idx += 1
         else:
-            analise += f"O setor {setor} está com bom desempenho.\n"
+            st.session_state.areas_respondidas.append(area)
+            outras = [a for a in abas if a not in st.session_state.areas_respondidas]
+            if outras:
+                st.session_state.proxima_area = outras[0]
+                st.session_state.estado = "perguntar_outra"
+            else:
+                st.session_state.estado = "relatorio"
 
-    st.subheader("Análise com GPT-4 (simulada)")
-    st.write(analise)
+elif st.session_state.estado == "perguntar_outra":
+    area = st.session_state.proxima_area
+    st.subheader(f"Deseja responder também sobre **{area}**?")
+    col1, col2 = st.columns(2)
+    if col1.button("Sim"):
+        st.session_state.area_atual = area
+        st.session_state.pergunta_idx = 0
+        st.session_state.estado = "perguntas"
+    elif col2.button("Não"):
+        st.session_state.estado = "relatorio"
 
-    # Gerar PDF
-    if st.button("Baixar Relatório PDF"):
-        path = gerar_pdf(analise, setores)
-        with open(path, "rb") as f:
-            st.download_button("Download PDF", f, file_name="diagnostico_resultado.pdf")
+elif st.session_state.estado == "relatorio":
+    st.success("Diagnóstico Concluído")
+    setores_areas = {}
+    for area, respostas in st.session_state.respostas.items():
+        nota_area = {}
+        pesos_area = {}
+        for setor, resp, peso in respostas:
+            mult = {"Sim": 1, "Não": 0, "Não sei": 0.5}.get(resp, 0)
+            nota_area[setor] = nota_area.get(setor, 0) + mult * peso
+            pesos_area[setor] = pesos_area.get(setor, 0) + peso
+        setores_areas[area] = {s: (nota_area[s] / pesos_area[s]) * 100 for s in nota_area}
+
+    for area, setores in setores_areas.items():
+        st.markdown(f"### Resultados - {area}")
+        st.markdown(f"**Pontuação Geral:** {np.mean(list(setores.values())):.1f}%")
+        gerar_grafico_radar(setores, area)
+
+    st.markdown("---")
+    analise = gerar_analise_simulada(setores_areas)
+    st.markdown(analise)
+    pdf = gerar_pdf(analise, setores_areas, st.session_state.dados_iniciais)
+    st.download_button("Baixar PDF do Diagnóstico", data=pdf, file_name="relatorio_rehsult.pdf")
