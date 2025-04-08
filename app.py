@@ -111,7 +111,6 @@ elif st.session_state.estado == "inicio":
 elif st.session_state.estado == "perguntas":
     area = st.session_state.area_atual
     perguntas = df[area].dropna(subset=["Pergunta"]).reset_index(drop=True)
-    st.session_state.pergunta_idx = 0
     linha = perguntas.iloc[st.session_state.pergunta_idx]
     st.markdown(f"**{linha['Pergunta']}**")
     resposta = st.radio("Selecione:", ["Sim", "Não", "Não sei"], key=f"resp_{st.session_state.pergunta_idx}")
