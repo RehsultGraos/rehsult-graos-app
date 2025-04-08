@@ -128,10 +128,11 @@ elif st.session_state.estado == "perguntas":
             st.session_state.areas_respondidas.append(area)
             outras = [a for a in abas if a not in st.session_state.areas_respondidas]
             if outras:
-                st.session_state.proxima_area = outras[0]
+                st.session_state.proxima_area = outras
                 st.session_state.estado = "perguntar_outra"
             else:
                 st.session_state.estado = "relatorio"
+        st.rerun()
 
 
 elif st.session_state.estado == "perguntar_outra":
