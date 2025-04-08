@@ -28,20 +28,17 @@ def gerar_grafico_radar(setores, titulo):
     st.pyplot(fig)
 
 def gerar_analise_simulada(setores_areas):
-    analise = "✅ **Análise Simulada:**
+    analise = """✅ **Análise Simulada:**
 
-"
+"""
     for area, setores in setores_areas.items():
         for setor, nota in setores.items():
             if nota < 50:
-                analise += f"- A área de **{setor}** em **{area}** apresenta baixa pontuação, indicando atenção.
-"
+                analise += f"- A área de **{setor}** em **{area}** apresenta baixa pontuação, indicando atenção.\n"
             elif nota < 75:
-                analise += f"- A área de **{setor}** em **{area}** está razoável, mas pode melhorar.
-"
+                analise += f"- A área de **{setor}** em **{area}** está razoável, mas pode melhorar.\n"
             else:
-                analise += f"- A área de **{setor}** em **{area}** está com boa pontuação.
-"
+                analise += f"- A área de **{setor}** em **{area}** está com boa pontuação.\n"
     analise += "\n🎯 **Recomendações:**\n- Revisar práticas nos setores com pontuação baixa.\n- Consultar especialistas para ações corretivas.\n"
     return analise
 
@@ -64,8 +61,7 @@ setores_por_area = {
 }
 
 # Gerar análise simulada
-texto = "🤖 Análise com GPT-4 (simulada)"
-st.subheader(texto)
+st.subheader("🤖 Análise com GPT-4 (simulada)")
 analise = gerar_analise_simulada(setores_por_area)
 st.markdown(analise)
 
