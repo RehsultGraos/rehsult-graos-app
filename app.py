@@ -3,118 +3,74 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from fpdf import FPDF
 from io import BytesIO
+from fpdf import FPDF
 
-st.set_page_config(page_title="Rehsult Grãos", layout="centered")
+st.set_page_config(page_title="Rehsult Grãos", layout="wide")
 
-def gerar_grafico_radar(setores, area):
+def gerar_grafico_radar(setores, titulo):
     categorias = list(setores.keys())
     valores = list(setores.values())
 
-    # Corrigir para radar
-    categorias += categorias[:1]
-    valores += valores[:1]
+    categorias += [categorias[0]]
+    valores += [valores[0]]
 
-    angles = np.linspace(0, 2 * np.pi, len(categorias), endpoint=False).tolist()
-    angles += angles[:1]
+    angulos = np.linspace(0, 2 * np.pi, len(categorias), endpoint=False).tolist()
+    angulos += [angulos[0]]
 
-    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
-    ax.plot(angles, valores, marker='o')
-    ax.fill(angles, valores, alpha=0.25)
-    ax.set_xticks(angles[:-1])
+    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
+    ax.plot(angulos, valores, marker='o')
+    ax.fill(angulos, valores, alpha=0.3)
+    ax.set_yticklabels([])
+    ax.set_xticks(angulos[:-1])
     ax.set_xticklabels(categorias)
-    ax.set_title(f"Radar - {area}")
+    ax.set_title(f"Radar - {titulo}")
     st.pyplot(fig)
 
-def gerar_pdf(analise):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.multi_cell(0, 10, analise)
-    buffer = BytesIO()
-    pdf.output(buffer)
-    buffer.seek(0)
-    return buffer
-
 def gerar_analise_simulada(setores_areas):
-    texto = "🤖 Análise com GPT-4 (simulada)
+    analise = "✅ **Análise Simulada:**
 
-✅ Análise Simulada:
 "
     for area, setores in setores_areas.items():
-        for setor, valor in setores.items():
-            if valor < 50:
-                texto += f"- O setor de **{setor}** em **{area}** está com baixa pontuação. Sugere-se revisão das práticas adotadas.
+        for setor, nota in setores.items():
+            if nota < 50:
+                analise += f"- A área de **{setor}** em **{area}** apresenta baixa pontuação, indicando atenção.
 "
-            elif valor < 70:
-                texto += f"- O setor de **{setor}** em **{area}** apresenta pontuação mediana. Pode haver oportunidades de melhoria.
+            elif nota < 75:
+                analise += f"- A área de **{setor}** em **{area}** está razoável, mas pode melhorar.
 "
             else:
-                texto += f"- O setor de **{setor}** em **{area}** está indo bem. Manter as práticas atuais.
+                analise += f"- A área de **{setor}** em **{area}** está com boa pontuação.
 "
-    return texto
+    analise += "\n🎯 **Recomendações:**\n- Revisar práticas nos setores com pontuação baixa.\n- Consultar especialistas para ações corretivas.\n"
+    return analise
 
-# Layout
+# Interface
 st.title("🌱 Rehsult Grãos")
 st.markdown("Versão com GPT-4 (simulada) integrada ao diagnóstico")
 
-# Simulação das notas por setor (exemplo)
+# Simulação de dados
 setores_por_area = {
-    "Planta Daninha": {
-        "Pré-emergente": 45,
-        "Cobertura": 65,
-        "Pós-emergente": 80
+    "Plantas Daninhas": {
+        "Pré-emergente": 35.0,
+        "Cobertura": 65.0,
+        "Pós-emergente": 85.0
     },
     "Fertilidade": {
-        "Calagem e Gessagem": 40,
-        "Macronutrientes": 72,
-        "Micronutrientes": 88
+        "Análise de Solo": 45.0,
+        "Calagem e Gessagem": 55.0,
+        "Macronutrientes": 78.0
     }
 }
 
-# Escolha da área para iniciar
-if "area_atual" not in st.session_state:
-    st.session_state.area_atual = None
+# Gerar análise simulada
+texto = "🤖 Análise com GPT-4 (simulada)"
+st.subheader(texto)
+analise = gerar_analise_simulada(setores_por_area)
+st.markdown(analise)
 
-if st.session_state.area_atual is None:
-    st.subheader("Qual área deseja começar?")
-    area_escolhida = st.radio("", ["Planta Daninha", "Fertilidade"])
-    if st.button("Iniciar Diagnóstico"):
-        st.session_state.area_atual = area_escolhida
-        st.experimental_rerun()
-
-# Apresenta gráfico e análise simulada
-else:
-    area = st.session_state.area_atual
-    setores = setores_por_area.get(area, {})
-
-    st.markdown(f"### ✅ Diagnóstico Concluído")
+# Exibir gráficos
+for area, setores in setores_por_area.items():
     st.markdown(f"### 📊 Resultados - {area}")
-    media = np.mean(list(setores.values()))
-    st.markdown(f"**Pontuação Geral:** {media:.1f}%")
+    st.markdown(f"**Pontuação Geral:** {np.mean(list(setores.values())):.1f}%")
     gerar_grafico_radar(setores, area)
-
-    # Perguntar se deseja responder outra área
-    outras_areas = [a for a in setores_por_area if a != area]
-    if outras_areas:
-        st.markdown("### Deseja responder também sobre " + outras_areas[0] + "?")
-        col1, col2 = st.columns(2)
-        if col1.button("✅ Sim"):
-            st.session_state.area_atual = outras_areas[0]
-            st.experimental_rerun()
-        elif col2.button("❌ Não"):
-            st.session_state.area_atual = "finalizar"
-            st.experimental_rerun()
-    else:
-        st.session_state.area_atual = "finalizar"
-        st.experimental_rerun()
-
-# Tela final
-if st.session_state.area_atual == "finalizar":
-    st.markdown("## 🤖 Análise com GPT-4 (simulada)")
-    analise = gerar_analise_simulada(setores_por_area)
-    st.write(analise)
-
-    buffer = gerar_pdf(analise)
-    st.download_button("📥 Baixar PDF da Análise", data=buffer, file_name="analise_rehsult.pdf")
