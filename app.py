@@ -3,75 +3,12 @@ from fpdf import FPDF
 
 class PDF(FPDF):
     def header(self):
-        self.set_font("DejaVu", "", 12)
+        self.set_font("Arial", "", 12)
         self.cell(0, 10, "Relatório do Diagnóstico - Rehsult Grãos", ln=True, align="C")
 
 
-def limpar(texto):
-    try:
-        return texto.encode('latin-1', 'ignore').decode('latin-1').strip()
-    except:
-        return "Erro ao processar texto para PDF."
 
-
-import streamlit as st
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 from fpdf import FPDF
-from io import BytesIO
-from math import pi
-
-st.set_page_config(page_title="Rehsult Grãos", layout="centered")
-st.image("LOGO REAGRO TRATADA.png", width=200)
-
-st.title("Rehsult Grãos")
-st.markdown("Diagnóstico de fazendas produtoras de grãos com análise simulada GPT-4")
-
-# ---------- ETAPA INICIAL ----------
-if "estado" not in st.session_state:
-    st.session_state.estado = "dados_iniciais"
-    st.session_state.respostas = {}
-    st.session_state.areas_respondidas = []
-    st.session_state.dados_iniciais = {}
-
-# ---------- FUNÇÕES AUXILIARES ----------
-def gerar_grafico_radar(setores, area):
-    setores = {k: v for k, v in setores.items() if pd.notnull(v)}
-    if len(setores) < 3:
-        st.warning(f"Não há dados suficientes para gerar o gráfico de {area}.")
-        return
-
-    categorias = list(setores.keys())
-    valores = list(setores.values())
-    valores += valores[:1]
-    N = len(categorias)
-    angulos = [n / float(N) * 2 * pi for n in range(N)]
-    angulos += angulos[:1]
-
-    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
-    ax.set_theta_offset(pi / 2)
-    ax.set_theta_direction(-1)
-    ax.set_xticks(angulos[:-1])
-    ax.set_xticklabels(categorias)
-    ax.set_rlabel_position(0)
-    ax.plot(angulos, valores, marker='o')
-    ax.fill(angulos, valores, alpha=0.3)
-    ax.set_title(f"Radar - {area}")
-    st.pyplot(fig)
-
-def gerar_analise_simulada(setores_areas):
-    texto = "Analise GPT-4 (simulada):\n\n"
-    for area, setores in setores_areas.items():
-        for setor, nota in setores.items():
-            if nota < 50:
-                texto += f"- O setor {setor} em {area} apresenta baixa pontuação.\n"
-            elif nota < 75:
-                texto += f"- O setor {setor} em {area} está mediano.\n"
-            else:
-                texto += f"- O setor {setor} em {area} apresenta bom desempenho.\n"
-    texto += "\nRecomendações:\n- Revisar práticas nos setores com desempenho fraco.\n- Otimizar os setores intermediários.\n"
-    return texto
 
 def gerar_pdf(analise, setores_areas, dados_iniciais):
     
