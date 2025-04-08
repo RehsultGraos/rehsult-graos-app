@@ -76,4 +76,3 @@ if st.button("Simular Diagnóstico"):
     pdf_path = gerar_pdf(analise, setores_areas)
     st.success("✅ Diagnóstico concluído com sucesso.")
     st.download_button(label="📄 Baixar Relatório PDF", data=open("/mnt/data/diagnostico_completo_corrigido.pdf", "rb"), file_name="diagnostico_completo.pdf")
-
