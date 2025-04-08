@@ -118,7 +118,7 @@ elif st.session_state.estado == "perguntas":
     resposta = st.radio("Escolha:", ["Sim", "Não", "Não sei"], key=f"r{linha['Referência']}")
 
     if st.button("Responder"):
-        st.session_state.respostas.setdefault(area, []).append((linha["Referência"], resposta, linha["Peso"], linha["Setor"], linha["Resposta Correta"]))
+        st.session_state.respostas.setdefault(area, []).append((linha["Referência"], resposta, linha["Peso"], linha["Setor"], linha["Resposta"]))
         proxima = linha["Próxima (Sim)"] if resposta == "Sim" else linha["Próxima (Não)"]
         if pd.isna(proxima):
             st.session_state.areas_respondidas.append(area)
