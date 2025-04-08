@@ -1,65 +1,42 @@
-
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from fpdf import FPDF
-import os
+from io import BytesIO
+from PIL import Image
 
-st.set_page_config(page_title="Rehsult Grãos", layout="centered")
+# Logo
+st.image("LOGO REAGRO TRATADA.png", width=150)
+st.markdown("# 🌱 Rehsult Grãos")
+st.markdown("Diagnóstico de fazendas produtoras de grãos com análise simulada GPT-4")
 
-# Função para gerar PDF
-def gerar_pdf(analise, setores_areas):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
+# Entradas iniciais
+with st.form("info_fazenda"):
+    col1, col2 = st.columns(2)
+    nome_resp = col1.text_input("👨‍🌾 Nome do responsável pela fazenda")
+    nome_fazenda = col2.text_input("🏡 Nome da fazenda")
+    prod_esperada = st.text_input("🌾 Produtividade média esperada (sc/ha)")
+    submitted = st.form_submit_button("Iniciar Diagnóstico")
+    if submitted:
+        st.session_state.respostas = {}
+        st.session_state.pergunta_id = 1
+        st.experimental_rerun()
 
-    pdf.cell(200, 10, txt="Diagnóstico Rehsult Grãos", ln=True, align="C")
-    pdf.ln(10)
-    pdf.multi_cell(0, 10, "Análise com GPT-4 (simulada):")
-    pdf.multi_cell(0, 10, analise)
-    pdf.ln(10)
-
-    for area, setores in setores_areas.items():
-        pdf.cell(200, 10, txt=f"{area}:", ln=True)
-        for setor, score in setores.items():
-            pdf.cell(200, 10, txt=f"- {setor}: {score:.1f}%", ln=True)
-        pdf.ln(5)
-
-    pdf.output("/mnt/data/diagnostico_completo_corrigido.pdf")
-    return "/mnt/data/diagnostico_completo_corrigido.pdf"
-
-# Interface de simulação
-st.title("🌱 Rehsult Grãos")
-st.subheader("Diagnóstico de fazendas produtoras de grãos com análise simulada GPT-4")
-
-if st.button("Simular Diagnóstico"):
-    analise = """A área de Pré-emergente em Plantas Daninhas apresenta baixa pontuação, indicando atenção.
-A área de Cobertura em Plantas Daninhas está razoável, mas pode melhorar.
-A área de Pós-emergente em Plantas Daninhas está com boa pontuação.
-A área de Análise de Solo em Fertilidade apresenta baixa pontuação, indicando atenção.
-A área de Calagem e Gessagem em Fertilidade está razoável, mas pode melhorar.
-A área de Macronutrientes em Fertilidade está com boa pontuação.
-
-🎯 Recomendações:
-
-- Realizar análise de solo completa e aplicar calcário/gesso conforme recomendação.
-- Revisar o protocolo de pré-emergência e considerar produtos com maior residual.
-- Otimizar aplicação de cobertura para alcançar maior eficiência.
-- Manter o bom trabalho nos setores que estão com pontuação alta."""
-
-    setores_areas = {
-        "Plantas Daninhas": {
-            "Pré-emergente": 35.0,
-            "Cobertura": 60.0,
-            "Pós-emergente": 80.0
-        },
-        "Fertilidade": {
-            "Análise de Solo": 40.0,
-            "Calagem e Gessagem": 60.0,
-            "Macronutrientes": 85.0
-        }
-    }
-
-    gerar_pdf(analise, setores_areas)
-    st.success("✅ Diagnóstico concluído com sucesso.")
-    st.download_button(label="📄 Baixar Relatório PDF", data=open("/mnt/data/diagnostico_completo_corrigido.pdf", "rb"), file_name="diagnostico_completo.pdf")
+# Exemplo de pergunta
+if "pergunta_id" in st.session_state:
+    df = pd.read_excel("Teste Chat.xlsx")
+    linha = df[df["Referência"] == st.session_state.pergunta_id].iloc[0]
+    st.markdown(f"### {linha['Pergunta']}")
+    col1, col2, col3 = st.columns(3)
+    if col1.button("✅ Sim"):
+        st.session_state.respostas[linha["Referência"]] = "Sim"
+        st.session_state.pergunta_id = linha["Próxima (Sim)"]
+        st.experimental_rerun()
+    if col2.button("❌ Não"):
+        st.session_state.respostas[linha["Referência"]] = "Não"
+        st.session_state.pergunta_id = linha["Próxima (Não)"]
+        st.experimental_rerun()
+    if col3.button("🤔 Não sei"):
+        st.session_state.respostas[linha["Referência"]] = "Não sei"
+        st.session_state.pergunta_id = linha["Próxima (Não)"]
+        st.experimental_rerun()
