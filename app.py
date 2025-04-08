@@ -1,4 +1,12 @@
 
+from fpdf import FPDF
+
+class PDF(FPDF):
+    def header(self):
+        self.set_font("DejaVu", "", 12)
+        self.cell(0, 10, "Relatório do Diagnóstico - Rehsult Grãos", ln=True, align="C")
+
+
 def limpar(texto):
     try:
         return texto.encode('latin-1', 'ignore').decode('latin-1').strip()
