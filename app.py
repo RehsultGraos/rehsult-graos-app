@@ -118,9 +118,9 @@ elif st.session_state.estado == "perguntas":
         st.session_state.respostas.setdefault(area, []).append((linha["Setor"], resposta, linha["Peso"]))
 
         if resposta == "Sim":
-            proxima = linha["Sim"] if pd.notna(linha["Sim"]-1) else None
+            proxima = linha["Sim"]-1 if pd.notna(linha["Sim"]) else None
         else:
-            proxima = linha["Não"] if pd.notna(linha["Não"]-1) else None
+            proxima = linha["Não"]-1 if pd.notna(linha["Não"]) else None
 
         if proxima is not None:
             st.session_state.pergunta_idx = proxima
