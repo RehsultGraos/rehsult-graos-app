@@ -1,121 +1,119 @@
-
 import streamlit as st
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-from fpdf import FPDF
+import numpy as np
 from io import BytesIO
+from fpdf import FPDF
 
-st.set_page_config(page_title="Rehsult Grãos", layout="centered")
+st.set_page_config(page_title="Rehsult Grãos", layout="wide")
+st.title("🌱 Rehsult Grãos")
+st.markdown("Diagnóstico de fazendas produtoras de grãos com análise simulada GPT-4")
 
-# Função para gerar gráfico radar
+# Dados simulados para perguntas iniciais
+if "fazenda" not in st.session_state:
+    st.session_state.fazenda = ""
+    st.session_state.produtividade_soja = 0
+    st.session_state.produtividade_milho = 0
+    st.session_state.coletado_dados = False
+
+if not st.session_state.coletado_dados:
+    st.subheader("Informações iniciais da fazenda")
+    st.session_state.fazenda = st.text_input("Nome da Fazenda")
+    st.session_state.produtividade_soja = st.number_input("Produtividade de Soja (sc/ha)", 0.0, 100.0)
+    st.session_state.produtividade_milho = st.number_input("Produtividade de Milho (sc/ha)", 0.0, 100.0)
+    if st.button("Iniciar Diagnóstico"):
+        st.session_state.coletado_dados = True
+        st.rerun()
+    st.stop()
+
+# Dados simulados de pontuação por setor
+setores_areas = {
+    "Planta Daninha": {
+        "Manejo integrado": 95,
+        "Pré emergente": 90,
+        "Dessecação": 85,
+        "Capina": 92,
+    },
+    "Fertilidade": {
+        "Análise de Solo": 70,
+        "Calagem e Gessagem": 78,
+        "Macronutrientes": 88
+    }
+}
+
+# Geração do gráfico radar
 def gerar_grafico_radar(setores, area):
     categorias = list(setores.keys())
     valores = list(setores.values())
-    N = len(categorias)
+    valores += valores[:1]  # fecha o gráfico
 
-    valores += valores[:1]
-    angulos = [n / float(N) * 2 * np.pi for n in range(N)]
+    angulos = np.linspace(0, 2 * np.pi, len(categorias), endpoint=False).tolist()
     angulos += angulos[:1]
 
-    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
-    ax.set_theta_offset(np.pi / 2)
-    ax.set_theta_direction(-1)
-
-    plt.xticks(angulos[:-1], categorias)
+    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
     ax.plot(angulos, valores, marker='o')
     ax.fill(angulos, valores, alpha=0.25)
+    ax.set_thetagrids(np.degrees(angulos[:-1]), categorias)
+    ax.set_title(f"Radar - {area}")
     st.pyplot(fig)
 
-# Função para gerar PDF
+# Geração da análise simulada
+def gerar_analise_simulada(setores_dict):
+    analise = "🤖 **Análise com GPT-4 (simulada)**\n"
+    analise += "\n✅ **Análise Simulada:**\n"
+    for area, setores in setores_dict.items():
+        for setor, score in setores.items():
+            if score < 60:
+                analise += f"- O setor **{setor}** em **{area}** apresenta baixa pontuação, indicando atenção.\n"
+            elif score < 80:
+                analise += f"- O setor **{setor}** em **{area}** está razoável, mas pode melhorar.\n"
+            else:
+                analise += f"- O setor **{setor}** em **{area}** está com boa pontuação.\n"
+    analise += "\n🎯 **Recomendações:**\n"
+    analise += "- Revisar práticas nos setores com desempenho fraco.\n"
+    analise += "- Otimizar os setores intermediários."
+    return analise
+
+# Geração do PDF
 def gerar_pdf(analise, setores_areas):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
 
-    pdf.multi_cell(0, 10, txt="Rehsult Grãos - Diagnóstico com GPT-4 (simulado)", align='C')
-    pdf.ln()
+    try:
+        pdf.multi_cell(0, 10, analise.encode('latin1').decode('latin1'))
+    except UnicodeEncodeError:
+        texto_tratado = analise.encode('latin1', 'replace').decode('latin1')
+        pdf.multi_cell(0, 10, texto_tratado)
 
     for area, setores in setores_areas.items():
+        pdf.ln(5)
         pdf.set_font("Arial", 'B', 12)
-        pdf.cell(0, 10, f"Resultados - {area}", ln=True)
+        pdf.cell(0, 10, f"{area}", ln=True)
         pdf.set_font("Arial", size=12)
-        for setor, valor in setores.items():
-            pdf.cell(0, 10, f"{setor}: {valor:.1f}%", ln=True)
-        pdf.ln()
-
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, "Análise Simulada:", ln=True)
-    pdf.set_font("Arial", size=12)
-    pdf.multi_cell(0, 10, analise)
-
-    buffer = BytesIO()
-    pdf.output(buffer)
-    buffer.seek(0)
-    return buffer
-
-# Função simulada para gerar análise com IA
-def gerar_analise_simulada(setores_areas):
-    analise = "✅ **Análise Simulada:**\n"
-    recomendacoes = []
-
-    for area, setores in setores_areas.items():
         for setor, score in setores.items():
-            if score < 50:
-                analise += f"- A área de **{setor}** em **{area}** apresenta baixa pontuação, indicando atenção.\n"
-                recomendacoes.append(f"Melhorar práticas em {setor} ({area}).")
-            elif score < 75:
-                analise += f"- A área de **{setor}** em **{area}** está razoável, mas pode melhorar.\n"
-                recomendacoes.append(f"Revisar estratégias em {setor} ({area}).")
-            else:
-                analise += f"- A área de **{setor}** em **{area}** está com boa pontuação.\n"
+            linha = f"{setor}: {score:.1f}%"
+            try:
+                pdf.cell(0, 10, linha.encode('latin1').decode('latin1'), ln=True)
+            except UnicodeEncodeError:
+                linha_tratada = linha.encode('latin1', 'replace').decode('latin1')
+                pdf.cell(0, 10, linha_tratada, ln=True)
 
-    analise += "\n🎯 **Recomendações:**\n"
-    for r in recomendacoes:
-        analise += f"- {r}\n"
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    return BytesIO(pdf_bytes)
 
-    return analise
+# Resultado
+st.subheader("\n✅ Diagnóstico Concluído")
+for area, setores in setores_areas.items():
+    st.markdown(f"\n### \ud83d\udcca Resultados - {area}")
+    media = np.mean(list(setores.values()))
+    st.markdown(f"**Pontuação Geral:** {media:.1f}%")
+    gerar_grafico_radar(setores, area)
 
-# Simulação dos dados finais
-setores_areas = {
-    "Plantas Daninhas": {
-        "Pré-emergente": 45,
-        "Cobertura": 70,
-        "Pós-emergente": 85
-    },
-    "Fertilidade": {
-        "Análise de Solo": 48,
-        "Calagem e Gessagem": 60,
-        "Macronutrientes": 80
-    }
-}
+# Análise
+analise = gerar_analise_simulada(setores_areas)
+st.markdown("\n" + analise)
 
-st.title("🌱 Rehsult Grãos")
-st.markdown("Diagnóstico de fazendas produtoras de grãos com análise simulada GPT-4")
-
-if "mostrar_resultado" not in st.session_state:
-    st.session_state.mostrar_resultado = False
-
-if not st.session_state.mostrar_resultado:
-    if st.button("Iniciar Diagnóstico"):
-        st.session_state.mostrar_resultado = True
-        st.rerun()
-else:
-    st.success("✅ Diagnóstico Concluído")
-    for area, setores in setores_areas.items():
-        st.markdown(f"### 📊 Resultados - {area}")
-        media = np.mean(list(setores.values()))
-        st.markdown(f"**Pontuação Geral:** {media:.1f}%")
-        gerar_grafico_radar(setores, area)
-
-    analise = gerar_analise_simulada(setores_areas)
-    st.markdown("### 🤖 Análise com GPT-4 (simulada)")
-    st.markdown(analise)
-
-    pdf_buffer = gerar_pdf(analise, setores_areas)
-    st.download_button(
-        label="📥 Baixar Relatório em PDF",
-        data=pdf_buffer,
-        file_name="diagnostico_rehsult_graos.pdf",
-        mime="application/pdf"
-    )
+# PDF download
+pdf_buffer = gerar_pdf(analise, setores_areas)
+st.download_button("📄 Baixar Relatório em PDF", data=pdf_buffer, file_name="relatorio_diagnostico.pdf")
