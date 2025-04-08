@@ -122,7 +122,7 @@ elif st.session_state.estado == "perguntas":
         else:
             proxima = linha["Não"]-1 if pd.notna(linha["Não"]-1) else None
 
-        if proxima is not None:
+        if proxima != -1:
             st.session_state.pergunta_idx = proxima
         else:
             st.session_state.areas_respondidas.append(area)
