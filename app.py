@@ -81,7 +81,10 @@ def gerar_pdf(analise, setores_areas, dados_iniciais):
     pdf.cell(200, 10, limpar("Análise GPT-4 (simulada)"), ln=True)
     pdf.set_font("Arial", size=12)
     for linha in analise.split("\n"):
-        pdf.multi_cell(0, 10, limpar(linha))
+        try:
+            pdf.multi_cell(0, 10, limpar(linha))
+        except:
+            pdf.multi_cell(0, 10, "Linha inválida para PDF")
 
     pdf_bytes = pdf.output(dest='S').encode('latin1')
     return BytesIO(pdf_bytes)
