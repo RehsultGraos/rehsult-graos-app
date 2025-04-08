@@ -3,8 +3,19 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from fpdf import FPDF
+import os
 
-# Função para gerar PDF corrigida
+# Carrega a planilha e limpa nomes de colunas
+df = pd.read_excel("Teste Chat.xlsx")
+df.columns = df.columns.str.strip()  # Remove espaços extras
+
+# Inicialização de estados
+if "pergunta_id" not in st.session_state:
+    st.session_state.pergunta_id = df.iloc[0]["Referência"]
+    st.session_state.respostas = {}
+    st.session_state.encerrar = False
+
+# Função para gerar PDF
 def gerar_pdf(analise, setores):
     pdf = FPDF()
     pdf.add_page()
@@ -12,36 +23,25 @@ def gerar_pdf(analise, setores):
     pdf.set_font("DejaVu", size=12)
     pdf.multi_cell(0, 10, "Análise com GPT-4 (simulada):\n")
     pdf.multi_cell(0, 10, analise)
-    output_path = "/mnt/data/diagnostico_completo_corrigido.pdf"
+    output_path = "/mnt/data/diagnostico_corrigido.pdf"
     pdf.output(output_path)
     return output_path
 
-# Carregamento da planilha
-df = pd.read_excel("Teste Chat.xlsx")
-
-# Inicializa o estado da aplicação
-if "pergunta_id" not in st.session_state:
-    st.session_state.pergunta_id = df.iloc[0]["Referência"]
-    st.session_state.respostas = {}
-    st.session_state.area_atual = df.iloc[0]["Área"]
-    st.session_state.encerrar = False
-
-# Interface
 st.image("LOGO REAGRO TRATADA.png", width=150)
 st.title("Rehsult Grãos")
 st.caption("Diagnóstico de fazendas produtoras de grãos com análise simulada GPT-4")
 
 if not st.session_state.encerrar:
-    linha = df[df["Referência"] == st.session_state.pergunta_id]
+    linha_df = df[df["Referência"] == st.session_state.pergunta_id]
+    if not linha_df.empty:
+        linha = linha_df.iloc[0]
 
-    if not linha.empty:
-        linha = linha.iloc[0]
-
-        # Verifica dependência (vínculo)
-        if pd.notna(linha["Vínculo"]):
-            resposta_vinculo = st.session_state.respostas.get(linha["Vínculo"], [None])[1]
-            if resposta_vinculo != "Sim":
-                st.session_state.pergunta_id = linha["Sim"]
+        # Verifica vínculo condicional
+        if "Vínculo" in linha and pd.notna(linha["Vínculo"]):
+            ref_dependente = int(linha["Vínculo"])
+            resposta_dependente = st.session_state.respostas.get(ref_dependente, {}).get("Resposta")
+            if resposta_dependente != "Sim":
+                st.session_state.pergunta_id = int(linha["Sim"])
                 st.rerun()
 
         st.subheader(f"{linha['Setor']} - {linha['Pergunta']}")
@@ -49,33 +49,36 @@ if not st.session_state.encerrar:
 
         if st.button("Responder"):
             area = linha["Área"]
-            st.session_state.respostas.setdefault(area, []).append(
-                (linha["Referência"], resposta, linha["Peso"], linha["Setor"], linha["Resposta"])
-            )
+            st.session_state.respostas.setdefault(area, []).append((
+                linha["Referência"],
+                resposta,
+                linha["Peso"],
+                linha["Setor"],
+                linha["Resposta"]
+            ))
             proxima = linha["Sim"] if resposta == "Sim" else linha["Não"]
             if pd.isna(proxima):
                 st.session_state.encerrar = True
             else:
-                st.session_state.pergunta_id = proxima
+                st.session_state.pergunta_id = int(proxima)
             st.rerun()
 else:
     st.success("Diagnóstico parcial concluído.")
-    respostas_df = pd.DataFrame(
-        [(area, *r) for area, lista in st.session_state.respostas.items() for r in lista],
-        columns=["Área", "Referência", "Resposta", "Peso", "Setor", "Resposta_Correta"]
-    )
-    respostas_df["Score"] = respostas_df.apply(
-        lambda x: x["Peso"] if str(x["Resposta"]).strip() == str(x["Resposta_Correta"]).strip() else 0, axis=1
-    )
 
-    setores = respostas_df.groupby("Setor")["Score"].sum().to_dict()
-    total = respostas_df["Score"].sum()
+    resultados = []
+    for area, respostas in st.session_state.respostas.items():
+        for ref, resposta, peso, setor, correta in respostas:
+            score = peso if str(resposta).strip() == str(correta).strip() else 0
+            resultados.append({"Área": area, "Setor": setor, "Score": score})
 
-    st.write("\n\n### Resultados por Setor")
+    df_resultado = pd.DataFrame(resultados)
+    setores = df_resultado.groupby("Setor")["Score"].sum().to_dict()
+
+    st.write("### Resultados por Setor")
     for setor, score in setores.items():
         st.write(f"- **{setor}**: {score:.1f} pontos")
 
-    # Análise simulada
+    # Análise Simulada
     analise = ""
     for setor, score in setores.items():
         if score < 2:
@@ -88,7 +91,7 @@ else:
     st.subheader("Análise com GPT-4 (simulada)")
     st.write(analise)
 
-    # Gerar PDF
+    # PDF
     if st.button("Baixar Relatório PDF"):
         path = gerar_pdf(analise, setores)
         with open(path, "rb") as f:
