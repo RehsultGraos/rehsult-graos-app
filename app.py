@@ -28,24 +28,35 @@ def gerar_grafico_radar(setores, titulo):
     st.pyplot(fig)
 
 def gerar_analise_simulada(setores_areas):
-    texto = "🤖 **Análise com GPT-4 (simulada)**\n\n"
-    texto += "✅ **Análise Simulada:**\n\n"
+    texto = "Analise GPT-4: **Análise com GPT-4 (simulada)**
+
+"
+    texto += "Diagnóstico Concluído: **Análise Simulada:**
+
+"
     recomendacoes = []
     for area, setores in setores_areas.items():
         for setor, score in setores.items():
             if score < 40:
-                texto += f"- A área de **{setor}** em **{area}** apresenta baixa pontuação, indicando atenção.\n"
+                texto += f"- A área de **{setor}** em **{area}** apresenta baixa pontuação, indicando atenção.
+"
                 recomendacoes.append(f"Rever práticas em {setor.lower()} ({area.lower()}).")
             elif score < 70:
-                texto += f"- A área de **{setor}** em **{area}** está razoável, mas pode melhorar.\n"
+                texto += f"- A área de **{setor}** em **{area}** está razoável, mas pode melhorar.
+"
                 recomendacoes.append(f"Aprimorar estratégias em {setor.lower()} ({area.lower()}).")
             else:
-                texto += f"- A área de **{setor}** em **{area}** está com boa pontuação.\n"
+                texto += f"- A área de **{setor}** em **{area}** está com boa pontuação.
+"
 
     if recomendacoes:
-        texto += "\n🎯 **Recomendações:**\n\n"
+        texto += "
+Recomendações: **Recomendações:**
+
+"
         for rec in set(recomendacoes):
-            texto += f"- {rec}\n"
+            texto += f"- {rec}
+"
     return texto
 
 def gerar_pdf(analise, setores_areas):
@@ -82,7 +93,7 @@ if 'etapa' not in st.session_state:
 
 # Etapas do app
 if st.session_state.etapa == 'inicio':
-    st.title("🌱 Rehsult Grãos")
+    st.title("Rehsult Grãos Rehsult Grãos")
     st.markdown("Diagnóstico de fazendas produtoras de grãos com análise simulada GPT-4")
     st.session_state.nome = st.text_input("Qual seu nome?")
     st.session_state.produtividade_soja = st.text_input("Produtividade esperada de Soja (sc/ha)?")
@@ -116,7 +127,7 @@ elif st.session_state.etapa == 'pergunta_extra':
     outra = "Fertilidade" if st.session_state.area_atual == "Planta Daninha" else "Planta Daninha"
     st.write(f"Deseja responder também sobre {outra}?")
     col1, col2 = st.columns(2)
-    if col1.button("✅ Sim"):
+    if col1.button("Diagnóstico Concluído: Sim"):
         st.session_state.area_atual = outra
         st.session_state.etapa = 'perguntas'
     if col2.button("❌ Não"):
@@ -128,8 +139,8 @@ elif st.session_state.etapa == 'resultado':
     setores = respostas.groupby("Setor")["Score"].mean().to_dict()
     area_label = st.session_state.area_atual
 
-    st.markdown("## ✅ Diagnóstico Concluído")
-    st.markdown(f"### 📊 Resultados - {area_label}")
+    st.markdown("## Diagnóstico Concluído: Diagnóstico Concluído")
+    st.markdown(f"### Resultados - Resultados - {area_label}")
     st.markdown(f"**Pontuação Geral:** {round(np.mean(list(setores.values()))*100, 1)}%")
     gerar_grafico_radar(setores, area_label)
 
@@ -137,5 +148,7 @@ elif st.session_state.etapa == 'resultado':
     analise = gerar_analise_simulada(setores_areas)
     st.markdown(analise)
 
-    pdf = gerar_pdf(analise.replace("\n", "\n"), setores_areas)
-    st.download_button("📄 Baixar PDF", pdf, file_name="diagnostico_rehsult.pdf", mime="application/pdf")
+    pdf = gerar_pdf(analise.replace("
+", "
+"), setores_areas)
+    st.download_button("Baixar PDF: Baixar PDF", pdf, file_name="diagnostico_rehsult.pdf", mime="application/pdf")
