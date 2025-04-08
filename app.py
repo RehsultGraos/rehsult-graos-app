@@ -1,3 +1,11 @@
+
+def limpar(texto):
+    try:
+        return texto.encode('latin-1', 'ignore').decode('latin-1').strip()
+    except:
+        return "Erro ao processar texto para PDF."
+
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -58,10 +66,7 @@ def gerar_analise_simulada(setores_areas):
     return texto
 
 def gerar_pdf(analise, setores_areas, dados_iniciais):
-    def limpar(texto):
-        return str(texto).encode("latin-1", "replace").decode("latin-1")
-
-    pdf = FPDF()
+    
     pdf.add_page()
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, limpar(f"Nome da Fazenda: {dados_iniciais.get('nome', '')}"), ln=True)
