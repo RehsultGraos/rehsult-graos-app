@@ -57,7 +57,34 @@ def gerar_analise_simulada(setores_areas):
     texto += "\nRecomendações:\n- Revisar práticas nos setores com desempenho fraco.\n- Otimizar os setores intermediários.\n"
     return texto
 
+def gerar_pdf(analise, setores_areas, dados_iniciais):
+    def limpar(texto):
+        return str(texto).encode("latin-1", "replace").decode("latin-1")
 
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, limpar(f"Nome da Fazenda: {dados_iniciais.get('nome', '')}"), ln=True)
+    pdf.cell(200, 10, limpar(f"Produtividade Soja: {dados_iniciais.get('soja', '')} sc/ha"), ln=True)
+    pdf.cell(200, 10, limpar(f"Produtividade Milho: {dados_iniciais.get('milho', '')} sc/ha"), ln=True)
+    pdf.ln(5)
+
+    for area, setores in setores_areas.items():
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(200, 10, limpar(f"Área: {area}"), ln=True)
+        pdf.set_font("Arial", size=12)
+        for setor, val in setores.items():
+            pdf.cell(200, 10, limpar(f"{setor}: {val:.1f}%"), ln=True)
+        pdf.ln(5)
+
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(200, 10, limpar("Análise GPT-4 (simulada)"), ln=True)
+    pdf.set_font("Arial", size=12)
+    for linha in analise.split("\n"):
+        pdf.multi_cell(0, 10, limpar(linha))
+
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    return BytesIO(pdf_bytes)
 
 # ---------- FLUXO DO APP ----------
 df = pd.read_excel("Teste Chat.xlsx", sheet_name=None)
@@ -138,5 +165,3 @@ elif st.session_state.estado == "relatorio":
 
     st.markdown("---")
     analise = gerar_analise_simulada(setores_areas)
-    st.markdown(analise)
-        st.download_button("Baixar PDF do Diagnóstico", data=pdf, file_name="relatorio_rehsult.pdf")
