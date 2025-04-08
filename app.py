@@ -116,8 +116,14 @@ elif st.session_state.estado == "perguntas":
     resposta = st.radio("Selecione:", ["Sim", "Não", "Não sei"], key=f"resp_{st.session_state.pergunta_idx}")
     if st.button("Responder"):
         st.session_state.respostas.setdefault(area, []).append((linha["Setor"], resposta, linha["Peso"]))
-        if st.session_state.pergunta_idx + 1 < len(perguntas):
-            st.session_state.pergunta_idx += 1
+
+        if resposta == "Sim":
+            proxima = linha["Sim"] if pd.notna(linha["Sim"]) else None
+        else resposta == "Não":
+            proxima = linha["Não"] if pd.notna(linha["Não"]) else None
+
+        if proxima is not None:
+            st.session_state.pergunta_idx = proxima
         else:
             st.session_state.areas_respondidas.append(area)
             outras = [a for a in abas if a not in st.session_state.areas_respondidas]
@@ -126,6 +132,8 @@ elif st.session_state.estado == "perguntas":
                 st.session_state.estado = "perguntar_outra"
             else:
                 st.session_state.estado = "relatorio"
+        st.rerun()
+
 
 elif st.session_state.estado == "perguntar_outra":
     area = st.session_state.proxima_area
