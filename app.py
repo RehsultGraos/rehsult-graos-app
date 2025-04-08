@@ -1,133 +1,79 @@
 
 import streamlit as st
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 from fpdf import FPDF
-from io import BytesIO
-from math import pi
+import os
 
 st.set_page_config(page_title="Rehsult Grãos", layout="centered")
-st.image("LOGO REAGRO TRATADA.png", width=200)
 
-st.title("Rehsult Grãos")
-st.markdown("Diagnóstico de fazendas produtoras de grãos com análise simulada GPT-4")
+# Função para gerar PDF
+def gerar_pdf(analise, setores_areas):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
 
-if "estado" not in st.session_state:
-    st.session_state.estado = "dados_iniciais"
-    st.session_state.respostas = {}
-    st.session_state.areas_respondidas = []
-    st.session_state.dados_iniciais = {}
-    st.session_state.pergunta_id = None
-    st.session_state.area_atual = None
-
-# ---------- ETAPA INICIAL ----------
-if st.session_state.estado == "dados_iniciais":
-    with st.form("dados_form"):
-        nome = st.text_input("👤 Nome do responsável")
-        fazenda = st.text_input("🏡 Nome da fazenda")
-        soja = st.number_input("🌱 Produtividade de soja (sc/ha)", 0.0)
-        milho = st.number_input("🌽 Produtividade de milho (sc/ha)", 0.0)
-        submitted = st.form_submit_button("Iniciar")
-    if submitted:
-        st.session_state.dados_iniciais = {
-            "nome": nome,
-            "fazenda": fazenda,
-            "soja": soja,
-            "milho": milho
-        }
-        st.session_state.estado = "escolher_area"
-
-# ---------- ESCOLHER ÁREA ----------
-if st.session_state.estado == "escolher_area":
-    st.markdown("### Qual área deseja começar?")
-    opcao = st.radio("Área:", ["Fertilidade", "Planta Daninha"])
-    if st.button("Iniciar diagnóstico"):
-        st.session_state.area_atual = opcao
-        st.session_state.pergunta_id = 1
-        st.session_state.estado = "perguntando"
-
-# ---------- PERGUNTAS ----------
-if st.session_state.estado == "perguntando":
-    df = pd.read_excel("Teste Chat.xlsx", sheet_name=st.session_state.area_atual)
-    df.columns = df.columns.str.strip()
-    df = df.rename(columns={"Referência": "ID", "Vínculo": "Depende de", "Resposta": "Correta"})
-
-    while True:
-        linha = df[df["ID"] == st.session_state.pergunta_id]
-        if linha.empty:
-            st.session_state.areas_respondidas.append(st.session_state.area_atual)
-            st.session_state.estado = "resultado_parcial"
-            st.rerun()
-
-        row = linha.iloc[0]
-
-        if pd.notna(row["Depende de"]):
-            ref = int(row["Depende de"])
-            if st.session_state.respostas.get(ref, {}).get("resposta") != "Sim":
-                st.session_state.pergunta_id = int(row["Sim"]) if pd.notna(row["Sim"]) else None
-                st.rerun()
-
-        st.markdown(f"**{row['Pergunta']}**")
-        resposta = st.radio("Escolha uma opção:", ["Sim", "Não", "Não sei"], key=f"pergunta_{row['ID']}")
-        if st.button("Responder", key=f"responder_{row['ID']}"):
-            correta = row["Correta"]
-            ganho = 0
-            if isinstance(correta, str) and "==" in correta:
-                ref_id, esperado = correta.split("==")
-                ref_id = int(ref_id.strip())
-                esperado = esperado.strip()
-                if st.session_state.respostas.get(ref_id, {}).get("resposta") == esperado:
-                    ganho = row["Peso"]
-            elif resposta == correta:
-                ganho = row["Peso"]
-            elif resposta == "Não sei":
-                ganho = row["Peso"] * 0.5
-
-            st.session_state.respostas[row["ID"]] = {
-                "resposta": resposta,
-                "peso": row["Peso"],
-                "setor": row["Setor"],
-                "area": row["Área"],
-                "ganho": ganho
-            }
-
-            prox = row["Sim"] if resposta == "Sim" else row["Não"]
-            st.session_state.pergunta_id = int(prox) if pd.notna(prox) else None
-            st.rerun()
-        break
-
-# ---------- RESULTADO ----------
-if st.session_state.estado == "resultado_parcial":
-    st.success("✅ Diagnóstico parcial concluído.")
-    if len(st.session_state.areas_respondidas) == 1:
-        if st.session_state.areas_respondidas[0] == "Fertilidade":
-            proxima = "Planta Daninha"
-        else:
-            proxima = "Fertilidade"
-        if st.button(f"Deseja responder {proxima}?"):
-            st.session_state.area_atual = proxima
-            st.session_state.pergunta_id = 1
-            st.session_state.estado = "perguntando"
-            st.rerun()
-        if st.button("Finalizar diagnóstico"):
-            st.session_state.estado = "final"
-            st.rerun()
-
-# ---------- RELATÓRIO FINAL ----------
-if st.session_state.estado == "final":
-    st.subheader("📊 Resultado Final")
-    df_result = pd.DataFrame(st.session_state.respostas).T
-    setores_areas = {}
-    for area in df_result["area"].unique():
-        setores = df_result[df_result["area"] == area].groupby("setor")["ganho"].sum()
-        pesos = df_result[df_result["area"] == area].groupby("setor")["peso"].sum()
-        resultado = (setores / pesos * 100).fillna(0)
-        setores_areas[area] = resultado.to_dict()
+    pdf.cell(200, 10, txt="Diagnóstico Rehsult Grãos", ln=True, align="C")
+    pdf.ln(10)
+    pdf.cell(200, 10, txt="Análise com GPT-4 (simulada):", ln=True)
+    pdf.multi_cell(0, 10, analise)
+    pdf.ln(10)
 
     for area, setores in setores_areas.items():
-        st.markdown(f"### 🔍 {area}")
+        pdf.cell(200, 10, txt=f"{area}:", ln=True)
         for setor, score in setores.items():
-            st.write(f"- **{setor}**: {score:.1f}%")
+            pdf.cell(200, 10, txt=f"- {setor}: {score:.1f}%", ln=True)
+        pdf.ln(5)
 
-    st.balloons()
+    output_path = "/mnt/data/app_final_rehsultgraos.py"
+    pdf.output("/mnt/data/diagnostico_completo_corrigido.pdf")
+    return output_path
+
+# Interface para simular conclusão do diagnóstico
+st.title("🌱 Rehsult Grãos")
+st.subheader("Diagnóstico de fazendas produtoras de grãos com análise simulada GPT-4")
+
+if st.button("Simular Diagnóstico"):
+    analise = (
+        "A área de Pré-emergente em Plantas Daninhas apresenta baixa pontuação, indicando atenção.
+"
+        "A área de Cobertura em Plantas Daninhas está razoável, mas pode melhorar.
+"
+        "A área de Pós-emergente em Plantas Daninhas está com boa pontuação.
+"
+        "A área de Análise de Solo em Fertilidade apresenta baixa pontuação, indicando atenção.
+"
+        "A área de Calagem e Gessagem em Fertilidade está razoável, mas pode melhorar.
+"
+        "A área de Macronutrientes em Fertilidade está com boa pontuação.
+
+"
+        "🎯 Recomendações:
+
+"
+        "- Realizar análise de solo completa e aplicar calcário/gesso conforme recomendação.
+"
+        "- Revisar o protocolo de pré-emergência e considerar produtos com maior residual.
+"
+        "- Otimizar aplicação de cobertura para alcançar maior eficiência.
+"
+        "- Manter o bom trabalho nos setores que estão com pontuação alta."
+    )
+
+    setores_areas = {
+        "Plantas Daninhas": {
+            "Pré-emergente": 35.0,
+            "Cobertura": 60.0,
+            "Pós-emergente": 80.0
+        },
+        "Fertilidade": {
+            "Análise de Solo": 40.0,
+            "Calagem e Gessagem": 60.0,
+            "Macronutrientes": 85.0
+        }
+    }
+
+    pdf_path = gerar_pdf(analise, setores_areas)
+    st.success("✅ Diagnóstico concluído com sucesso.")
+    st.download_button(label="📄 Baixar Relatório PDF", data=open("/mnt/data/diagnostico_completo_corrigido.pdf", "rb"), file_name="diagnostico_completo.pdf")
+
