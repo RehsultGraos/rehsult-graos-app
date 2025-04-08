@@ -81,10 +81,10 @@ def gerar_pdf(analise, setores_areas, dados_iniciais):
     pdf.cell(200, 10, limpar("Análise GPT-4 (simulada)"), ln=True)
     pdf.set_font("Arial", size=12)
     for linha in analise.split("\n"):
-    try:
-        pdf.multi_cell(0, 10, linha.encode('latin-1', 'replace').decode('latin-1'))
-    except:
-        pdf.multi_cell(0, 10, "Erro ao renderizar esta linha.")
+        try:
+            pdf.multi_cell(0, 10, linha.encode('latin-1', 'replace').decode('latin-1'))
+        except:
+            pdf.multi_cell(0, 10, "Erro ao renderizar esta linha.")
 
     pdf_bytes = pdf.output(dest='S').encode('latin1')
     return BytesIO(pdf_bytes)
