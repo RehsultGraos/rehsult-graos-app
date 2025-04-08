@@ -165,3 +165,6 @@ elif st.session_state.estado == "relatorio":
 
     st.markdown("---")
     analise = gerar_analise_simulada(setores_areas)
+    st.markdown(analise)
+    pdf = gerar_pdf(analise, setores_areas, st.session_state.dados_iniciais)
+    
