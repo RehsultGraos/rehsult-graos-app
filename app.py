@@ -132,7 +132,6 @@ elif st.session_state.estado == "perguntas":
                 st.session_state.estado = "perguntar_outra"
             else:
                 st.session_state.estado = "relatorio"
-        st.rerun()
 
 
 elif st.session_state.estado == "perguntar_outra":
